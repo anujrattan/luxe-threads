@@ -1,0 +1,57 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        'brand-bg': '#0D091F',
+        'brand-surface': '#191333',
+        'brand-primary': '#FFFFFF',
+        'brand-secondary': '#A9A2C2',
+        'brand-accent': '#C056F0',
+        'brand-accent-hover': '#a845d0',
+        // New colors for light product card
+        'card-light-bg': '#FFFFFF',
+        'card-light-text-primary': '#111827',
+        'card-light-text-secondary': '#6B7280',
+        'tag-green-bg': '#E0F2F1',
+        'tag-green-text': '#0D9488',
+        'badge-pink-bg': '#F472B6',
+        'badge-purple-start': '#A855F7',
+        'badge-purple-end': '#D946EF',
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        display: ['Sora', 'sans-serif'],
+      },
+      keyframes: {
+        fadeIn: { '0%': { opacity: 0, transform: 'translateY(10px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
+        popIn: {
+          '0%': { transform: 'scale(0.95)', opacity: 0 },
+          '100%': { transform: 'scale(1)', opacity: 1 }
+        },
+        cartBump: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(0.9)' },
+          '50%': { transform: 'scale(1.2)' },
+        }
+      },
+      animation: {
+        fadeIn: 'fadeIn 0.5s ease-in-out forwards',
+        popIn: 'popIn 0.3s ease-out forwards',
+        cartBump: 'cartBump 0.4s ease-in-out',
+      },
+      backgroundImage: {
+        'footer-dots': 'radial-gradient(circle at center, rgba(169, 162, 194, 0.08) 1px, transparent 1px)',
+      },
+      backgroundSize: {
+        'footer-dots': '20px 20px',
+      },
+    },
+  },
+  plugins: [],
+}
+

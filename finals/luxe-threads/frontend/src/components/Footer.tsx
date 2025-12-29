@@ -1,0 +1,111 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import {
+    StarIcon, InstagramIcon, TwitterIcon, FacebookIcon, MailIcon,
+    ZapIcon, FlameIcon, Wand2Icon, TagIcon, HeartIcon, RulerIcon, TruckIcon,
+    Undo2Icon, HelpCircleIcon, SendIcon, GiftIcon, SparklesIcon,
+    LightbulbIcon
+} from './icons';
+
+export const Footer: React.FC = () => {
+  return (
+    <footer className="bg-brand-surface bg-footer-dots bg-footer-dots-size text-brand-secondary">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+
+        {/* Top Section: Links & Newsletter */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+          
+          {/* Column 1: Brand Info */}
+          <div className="flex flex-col">
+            <a href="#" className="flex items-center gap-2 mb-4">
+              <span className="text-2xl font-display font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                PODStore
+              </span>
+              <StarIcon className="w-5 h-5 text-yellow-400" />
+            </a>
+            <p className="text-sm max-w-xs">
+              Your premium destination for custom clothing. Quality materials, perfect fit, exceptional service.
+            </p>
+            <div className="flex items-center gap-3 mt-6">
+                <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 text-white hover:opacity-80 transition-opacity"><InstagramIcon className="w-5 h-5" /></a>
+                <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-sky-400 text-white hover:opacity-80 transition-opacity"><TwitterIcon className="w-5 h-5" /></a>
+                <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-700 text-white hover:opacity-80 transition-opacity"><FacebookIcon className="w-5 h-5" /></a>
+                <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-400 text-white hover:opacity-80 transition-opacity"><MailIcon className="w-5 h-5" /></a>
+            </div>
+          </div>
+
+          {/* Column 2: Shop */}
+          <div>
+            <h4 className="font-display font-bold text-brand-primary text-lg mb-4 flex items-center gap-2"><ZapIcon className="w-5 h-5 text-brand-accent" /> Shop</h4>
+            <ul className="space-y-3">
+              <li className="flex items-center gap-2">
+                <FlameIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/new-arrivals" className="hover:text-brand-primary transition-colors cursor-pointer">New Arrivals</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <SparklesIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/best-sellers" className="hover:text-brand-primary transition-colors cursor-pointer">Best Sellers</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <TagIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/sale" className="hover:text-brand-primary transition-colors cursor-pointer">Sale Items</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <Wand2Icon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/categories" className="hover:text-brand-primary transition-colors cursor-pointer">All Products</Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 3: Support */}
+          <div>
+            <h4 className="font-display font-bold text-brand-primary text-lg mb-4 flex items-center gap-2"><HeartIcon className="w-5 h-5 text-brand-accent" /> Support</h4>
+            <ul className="space-y-3">
+              <li className="flex items-center gap-2">
+                <RulerIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/size-guide" className="hover:text-brand-primary transition-colors cursor-pointer">Size Guide</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <TruckIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/shipping" className="hover:text-brand-primary transition-colors cursor-pointer">Shipping Info</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <Undo2Icon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/returns" className="hover:text-brand-primary transition-colors cursor-pointer">Returns</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <HelpCircleIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/faq" className="hover:text-brand-primary transition-colors cursor-pointer">FAQ</Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 4: Newsletter */}
+          <div>
+            <h4 className="font-display font-bold text-brand-primary text-lg mb-4 flex items-center gap-2"><MailIcon className="w-5 h-5 text-brand-accent" /> Stay Updated</h4>
+            <p className="text-sm mb-4">Get the latest drops, exclusive offers, and design inspiration delivered to your inbox.</p>
+            <form className="flex items-center">
+              <input type="email" placeholder="Enter your email" className="bg-brand-bg border border-white/20 rounded-l-lg w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent"/>
+              <button type="submit" className="bg-brand-accent hover:bg-brand-accent-hover text-white px-3 py-2 rounded-r-lg"><SendIcon className="w-5 h-5"/></button>
+            </form>
+             <ul className="space-y-2 mt-4 text-sm">
+              <li className="flex items-center gap-2"><GiftIcon className="w-4 h-4 text-green-400"/>Exclusive discounts</li>
+              <li className="flex items-center gap-2"><SparklesIcon className="w-4 h-4 text-yellow-400"/>Early access to new drops</li>
+              <li className="flex items-center gap-2"><LightbulbIcon className="w-4 h-4 text-blue-400"/>Design tips & inspiration</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Middle Divider & Links */}
+        <div className="mt-16 border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center text-sm gap-4">
+          <p className="order-2 md:order-1 text-center md:text-left">&copy; {new Date().getFullYear()} PODStore. All rights reserved. <span className="inline-flex items-center gap-1">Made with <HeartIcon className="w-4 h-4 text-pink-500 animate-heartbeat inline-block" /> for fashion lovers</span></p>
+          <div className="flex gap-4 order-1 md:order-2">
+            <a href="#" className="hover:text-brand-primary transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-brand-primary transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-brand-primary transition-colors">Cookie Policy</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+};
