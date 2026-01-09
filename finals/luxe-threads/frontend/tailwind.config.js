@@ -4,16 +4,25 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        // Brand colors - dark theme (default)
         'brand-bg': '#0D091F',
         'brand-surface': '#191333',
         'brand-primary': '#FFFFFF',
         'brand-secondary': '#A9A2C2',
         'brand-accent': '#C056F0',
         'brand-accent-hover': '#a845d0',
-        // New colors for light product card
+        // Logo color system
+        'logo-purple': '#9333EA',
+        'logo-purple-deep': '#7C3AED',
+        'logo-purple-bright': '#C056F0',
+        'logo-pink': '#EC4899',
+        'logo-yellow': '#F5E04E',
+        'logo-dark': '#0B0B10',
+        // Shared colors for both themes
         'card-light-bg': '#FFFFFF',
         'card-light-text-primary': '#111827',
         'card-light-text-secondary': '#6B7280',

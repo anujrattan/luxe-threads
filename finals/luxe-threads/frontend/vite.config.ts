@@ -18,7 +18,16 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       }
-    }
+    },
+    // Ensure SPA routing works - fallback to index.html for all routes
+    appType: 'spa',
+    build: {
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+        },
+      },
+    },
   };
 });
 

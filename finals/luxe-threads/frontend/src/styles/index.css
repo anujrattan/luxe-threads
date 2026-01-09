@@ -6,6 +6,80 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme-aware base styles using CSS variables */
+@layer base {
+  /* Light theme - default when no .dark class */
+  html {
+    --color-bg: #FFFFFF;
+    --color-surface: #F9FAFB;
+    --color-primary: #111827;
+    --color-secondary: #4B5563;
+    --color-accent: #9333EA;
+    --color-accent-hover: #7C3AED;
+    --color-card-bg: #FFFFFF;
+    --color-card-border: #D1D5DB;
+    --color-hero-text: #FFFFFF;
+  }
+  
+  /* Dark theme - when .dark class is present */
+  html.dark {
+    --color-bg: #0D091F;
+    --color-surface: #191333;
+    --color-primary: #FFFFFF;
+    --color-secondary: #A9A2C2;
+    --color-accent: #C056F0;
+    --color-accent-hover: #a845d0;
+    --color-card-bg: #191333;
+    --color-card-border: rgba(255, 255, 255, 0.1);
+    --color-hero-text: #FFFFFF;
+  }
+}
+
+/* Override Tailwind classes to use CSS variables */
+@layer utilities {
+  .bg-brand-bg {
+    background-color: var(--color-bg) !important;
+  }
+  .bg-brand-surface {
+    background-color: var(--color-surface) !important;
+  }
+  .text-brand-primary {
+    color: var(--color-primary) !important;
+  }
+  .text-brand-secondary {
+    color: var(--color-secondary) !important;
+  }
+  .text-brand-accent {
+    color: var(--color-accent) !important;
+  }
+  .border-brand-surface {
+    border-color: var(--color-surface) !important;
+  }
+}
+
+/* Theme-aware utility classes */
+@layer utilities {
+  /* Navigation active state - better contrast in light theme */
+  html:not(.dark) .text-yellow-400 {
+    color: #9333EA !important; /* Purple instead of yellow */
+  }
+  html:not(.dark) .bg-yellow-400\/20 {
+    background-color: rgba(147, 51, 234, 0.2) !important; /* Purple tint */
+  }
+  
+  /* Product card borders for light theme */
+  html:not(.dark) .border-gray-200\/50 {
+    border-color: #D1D5DB !important;
+    border-width: 1px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  /* Section backgrounds for better contrast */
+  html:not(.dark) .bg-brand-surface {
+    background-color: #F9FAFB !important; /* Matches color system */
+  }
+}
+
 /* Custom animations */
 @keyframes fadeIn {
   from {
@@ -59,6 +133,26 @@
   }
 }
 
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-in-out forwards;
 }
@@ -73,6 +167,14 @@
 
 .animate-heartbeat {
   animation: heartbeat 1.5s ease-in-out infinite;
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-slideInUp {
+  animation: slideInUp 0.5s ease-out forwards;
 }
 
 .card-3d-hover {

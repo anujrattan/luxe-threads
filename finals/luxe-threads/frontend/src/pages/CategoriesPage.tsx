@@ -13,6 +13,7 @@ export const CategoriesPage: React.FC = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -109,21 +110,31 @@ export const CategoriesPage: React.FC = () => {
       ? 'Express yourself with bold designs and premium quality.'
       : null;
 
+    const hasImageError = failedImages.has(category.id);
+    const shouldShowImage = imageUrl && !hasImageError;
+
     return (
       <div
         key={category.id}
         className={`relative group overflow-hidden rounded-2xl cursor-pointer ${heightClass}`}
         onClick={() => navigate(`/category/${category.slug}`)}
       >
-        <img
-          src={imageUrl}
-          alt={category.name}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-          onError={(e) => {
-            // Fallback image if URL fails
-            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x500?text=Category+Image';
-          }}
-        />
+        {shouldShowImage ? (
+          <img
+            src={imageUrl}
+            alt={category.name}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            onError={() => {
+              // Stop retrying - just mark as error and show fallback
+              setFailedImages(prev => new Set(prev).add(category.id));
+            }}
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+            <span className="text-gray-500 dark:text-gray-400 text-sm">No image</span>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent group-hover:from-black/90 transition-all duration-300"></div>
         <div className={`absolute bottom-0 left-0 right-0 ${padding}`}>
           <h3 className={`${textSize} font-display font-bold text-white ${isLarge ? 'mb-3' : 'mb-2'}`}>

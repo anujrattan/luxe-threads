@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     StarIcon, InstagramIcon, TwitterIcon, FacebookIcon, MailIcon,
     ZapIcon, FlameIcon, Wand2Icon, TagIcon, HeartIcon, RulerIcon, TruckIcon,
-    Undo2Icon, HelpCircleIcon, SendIcon, GiftIcon, SparklesIcon,
+    Undo2Icon, HelpCircleIcon, SendIcon, GiftIcon, TrendingUpIcon, BellIcon,
     LightbulbIcon
 } from './icons';
+import { useCookieConsent } from '../context/CookieConsentContext';
+import { CookiePreferencesModal } from './CookiePreferencesModal';
 
 export const Footer: React.FC = () => {
+  const [showCookiePreferences, setShowCookiePreferences] = useState(false);
+  const { consent, updateConsent } = useCookieConsent();
   return (
     <footer className="bg-brand-surface bg-footer-dots bg-footer-dots-size text-brand-secondary">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -17,14 +21,14 @@ export const Footer: React.FC = () => {
           
           {/* Column 1: Brand Info */}
           <div className="flex flex-col">
-            <a href="#" className="flex items-center gap-2 mb-4">
+            <Link to="/" className="flex items-center gap-2 mb-4">
               <span className="text-2xl font-display font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-                PODStore
+                Tinge Clothing
               </span>
               <StarIcon className="w-5 h-5 text-yellow-400" />
-            </a>
+            </Link>
             <p className="text-sm max-w-xs">
-              Your premium destination for custom clothing. Quality materials, perfect fit, exceptional service.
+              Your premium destination for quality clothing. Premium threads that match your energy.
             </p>
             <div className="flex items-center gap-3 mt-6">
                 <a href="#" className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-500 text-white hover:opacity-80 transition-opacity"><InstagramIcon className="w-5 h-5" /></a>
@@ -43,7 +47,7 @@ export const Footer: React.FC = () => {
                 <Link to="/new-arrivals" className="hover:text-brand-primary transition-colors cursor-pointer">New Arrivals</Link>
               </li>
               <li className="flex items-center gap-2">
-                <SparklesIcon className="w-4 h-4 text-brand-secondary"/>
+                <TrendingUpIcon className="w-4 h-4 text-brand-secondary"/>
                 <Link to="/best-sellers" className="hover:text-brand-primary transition-colors cursor-pointer">Best Sellers</Link>
               </li>
               <li className="flex items-center gap-2">
@@ -71,11 +75,15 @@ export const Footer: React.FC = () => {
               </li>
               <li className="flex items-center gap-2">
                 <Undo2Icon className="w-4 h-4 text-brand-secondary"/>
-                <Link to="/returns" className="hover:text-brand-primary transition-colors cursor-pointer">Returns</Link>
+                <Link to="/return-policy" className="hover:text-brand-primary transition-colors cursor-pointer">Return Policy</Link>
               </li>
               <li className="flex items-center gap-2">
                 <HelpCircleIcon className="w-4 h-4 text-brand-secondary"/>
                 <Link to="/faq" className="hover:text-brand-primary transition-colors cursor-pointer">FAQ</Link>
+              </li>
+              <li className="flex items-center gap-2">
+                <TruckIcon className="w-4 h-4 text-brand-secondary"/>
+                <Link to="/guest-order-lookup" className="hover:text-brand-primary transition-colors cursor-pointer">Track Order</Link>
               </li>
             </ul>
           </div>
@@ -90,7 +98,7 @@ export const Footer: React.FC = () => {
             </form>
              <ul className="space-y-2 mt-4 text-sm">
               <li className="flex items-center gap-2"><GiftIcon className="w-4 h-4 text-green-400"/>Exclusive discounts</li>
-              <li className="flex items-center gap-2"><SparklesIcon className="w-4 h-4 text-yellow-400"/>Early access to new drops</li>
+              <li className="flex items-center gap-2"><BellIcon className="w-4 h-4 text-yellow-400"/>Early access to new drops</li>
               <li className="flex items-center gap-2"><LightbulbIcon className="w-4 h-4 text-blue-400"/>Design tips & inspiration</li>
             </ul>
           </div>
@@ -98,14 +106,29 @@ export const Footer: React.FC = () => {
 
         {/* Middle Divider & Links */}
         <div className="mt-16 border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center text-sm gap-4">
-          <p className="order-2 md:order-1 text-center md:text-left">&copy; {new Date().getFullYear()} PODStore. All rights reserved. <span className="inline-flex items-center gap-1">Made with <HeartIcon className="w-4 h-4 text-pink-500 animate-heartbeat inline-block" /> for fashion lovers</span></p>
-          <div className="flex gap-4 order-1 md:order-2">
-            <a href="#" className="hover:text-brand-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-brand-primary transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-brand-primary transition-colors">Cookie Policy</a>
+          <p className="order-2 md:order-1 text-center md:text-left">&copy; {new Date().getFullYear()} Tinge Clothing. All rights reserved. <span className="inline-flex items-center gap-1">Made with <HeartIcon className="w-4 h-4 text-pink-500 animate-heartbeat inline-block" /> for fashion lovers</span></p>
+          <div className="flex flex-wrap gap-4 order-1 md:order-2 justify-center">
+            <Link to="/privacy-policy" className="hover:text-brand-primary transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-brand-primary transition-colors">Terms of Service</Link>
+            <Link to="/return-policy" className="hover:text-brand-primary transition-colors">Return Policy</Link>
+            <Link to="/cookie-policy" className="hover:text-brand-primary transition-colors">Cookie Policy</Link>
+            <button
+              onClick={() => setShowCookiePreferences(true)}
+              className="hover:text-brand-primary transition-colors cursor-pointer"
+            >
+              Cookie Settings
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Cookie Preferences Modal */}
+      <CookiePreferencesModal
+        isOpen={showCookiePreferences}
+        onClose={() => setShowCookiePreferences(false)}
+        onSave={updateConsent}
+        currentPreferences={consent}
+      />
     </footer>
   );
 };

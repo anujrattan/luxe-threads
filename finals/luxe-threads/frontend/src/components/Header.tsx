@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBagIcon, StarIcon, UserIcon, ChevronDownIcon, LogOutIcon, SettingsIcon } from './icons';
+import { ShoppingBagIcon, UserIcon, ChevronDownIcon, LogOutIcon, SettingsIcon, SunIcon, MoonIcon } from './icons';
 import { Category } from '../types';
 import api from '../services/api';
 import { useApp } from '../context/AppContext';
@@ -14,10 +14,11 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cartAnimationKey }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isAdmin, logout } = useApp();
+  const { user, isAuthenticated, isAdmin, logout, theme, toggleTheme } = useApp();
   const [categories, setCategories] = useState<Category[]>([]);
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const isHomePage = location.pathname === '/';
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -52,34 +53,35 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
   };
 
   return (
-    <header className="sticky top-2 z-50 w-full px-2">
+    <header className={`${isHomePage ? 'absolute' : 'sticky'} top-0 left-0 right-0 z-50 w-full px-2 pt-2 ${isHomePage ? 'bg-gradient-to-b from-black/50 to-transparent backdrop-blur-sm' : 'bg-transparent'}`}>
       <div className="mx-auto max-w-screen-xl flex items-center justify-between">
         {/* Logo - Left Side */}
         <Link 
           to="/"
-          className="flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity"
+          className="flex items-center flex-shrink-0 hover:opacity-80 transition-opacity py-2"
         >
-          <span className="text-2xl font-display font-bold tracking-tight bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            PODStore
-          </span>
-          <StarIcon className="w-5 h-5 text-yellow-400" />
+          <div className="h-16 sm:h-20 md:h-22 lg:h-24 w-auto overflow-hidden flex items-center justify-center px-1">
+            <img 
+              src={encodeURI("/Tinge Clothing - Logo - No background.png")} 
+              alt="Tinge Clothing Logo" 
+              className="h-[115%] w-auto object-contain object-center"
+              style={{ transform: 'scale(1.1)', transformOrigin: 'center' }}
+            />
+          </div>
         </Link>
 
         {/* Navigation Container - Center */}
-        <nav className="hidden md:flex items-center gap-1 w-fit mx-auto rounded-full bg-brand-surface/70 px-6 py-3 backdrop-blur-lg border border-white/10 shadow-lg">
+        <nav className="hidden md:flex items-center gap-1 w-fit mx-auto rounded-full bg-brand-surface px-6 py-2 backdrop-blur-lg border border-white/10 shadow-lg">
           {navItems.map(item => (
             <Link 
               key={item.name}
               to={item.path}
               className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-lg ${
-                isActive(item.path) ? 'text-brand-primary' : 'text-brand-secondary hover:text-brand-primary'
+                isActive(item.path) ? 'text-yellow-400 dark:text-yellow-400 text-purple-600' : 'text-brand-secondary hover:text-brand-primary'
               }`}
             >
               {isActive(item.path) && (
-                <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 opacity-20 blur-lg"></span>
-              )}
-              {isActive(item.path) && (
-                <span className="absolute inset-0 rounded-lg bg-white/10"></span>
+                <span className="absolute inset-0 rounded-lg bg-yellow-400/20 dark:bg-yellow-400/20 bg-purple-100"></span>
               )}
               <span className="relative z-10">{item.name}</span>
             </Link>
@@ -94,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
             <button
               className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-lg flex items-center gap-1 ${
                 isActive('/categories') || location.pathname.startsWith('/category/')
-                  ? 'text-brand-primary' 
+                  ? 'text-yellow-400 dark:text-yellow-400 text-purple-600' 
                   : 'text-brand-secondary hover:text-brand-primary'
               }`}
               onClick={() => {
@@ -104,10 +106,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
               }}
             >
               {(isActive('/categories') || location.pathname.startsWith('/category/')) && (
-                <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 opacity-20 blur-lg"></span>
-              )}
-              {(isActive('/categories') || location.pathname.startsWith('/category/')) && (
-                <span className="absolute inset-0 rounded-lg bg-white/10"></span>
+                <span className="absolute inset-0 rounded-lg bg-yellow-400/20 dark:bg-yellow-400/20 bg-purple-100"></span>
               )}
               <span className="relative z-10">Shop</span>
               <ChevronDownIcon className={`w-4 h-4 relative z-10 transition-transform ${shopDropdownOpen ? 'rotate-180' : ''}`} />
@@ -145,10 +144,35 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
 
         {/* Actions - Right Side */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Cart Icon - First */}
+          {/* Theme Switcher */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              toggleTheme();
+            }}
+            className={`relative p-2 transition-colors rounded-full ${
+              isHomePage 
+                ? 'text-white hover:text-white/80 hover:bg-white/20' 
+                : 'text-brand-secondary hover:text-brand-primary hover:bg-white/10 dark:hover:bg-white/10'
+            }`}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            type="button"
+          >
+            {theme === 'dark' ? (
+              <SunIcon className="h-5 w-5" />
+            ) : (
+              <MoonIcon className="h-5 w-5" />
+            )}
+          </button>
+
+          {/* Cart Icon */}
           <button 
             onClick={() => navigate('/cart')} 
-            className="relative p-2 text-brand-secondary hover:text-brand-primary transition-colors rounded-full hover:bg-white/10"
+            className={`relative p-2 transition-colors rounded-full ${
+              isHomePage 
+                ? 'text-white hover:text-white/80 hover:bg-white/20' 
+                : 'text-brand-secondary hover:text-brand-primary hover:bg-white/10 dark:hover:bg-white/10'
+            }`}
             aria-label="Shopping cart"
           >
             <div key={cartAnimationKey} className={cartAnimationKey > 0 ? 'animate-cartBump' : ''}>
@@ -166,7 +190,11 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="px-3 py-2 text-sm font-medium text-brand-secondary hover:text-brand-primary transition-colors rounded-full hover:bg-white/10 flex items-center gap-2"
+                className={`px-3 py-2 text-sm font-medium transition-colors rounded-full flex items-center gap-2 ${
+                  isHomePage 
+                    ? 'text-white hover:text-white/80 hover:bg-white/20' 
+                    : 'text-brand-secondary hover:text-brand-primary hover:bg-white/10'
+                }`}
                 aria-label="User menu"
               >
                 <UserIcon className="h-5 w-5" />
@@ -182,6 +210,22 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
                       <p className="text-sm font-semibold text-brand-primary truncate">{user.name || 'User'}</p>
                       <p className="text-xs text-brand-secondary truncate">{user.email}</p>
                     </div>
+                    <Link
+                      to="/orders"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2 text-sm text-brand-secondary hover:text-brand-primary hover:bg-white/5 transition-colors flex items-center gap-2"
+                    >
+                      <ShoppingBagIcon className="w-4 h-4" />
+                      My Orders
+                    </Link>
+                    <Link
+                      to="/profile"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2 text-sm text-brand-secondary hover:text-brand-primary hover:bg-white/5 transition-colors flex items-center gap-2"
+                    >
+                      <UserIcon className="w-4 h-4" />
+                      Profile
+                    </Link>
                     {isAdmin && (
                       <Link
                         to="/admin"
@@ -192,6 +236,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
                         Admin Panel
                       </Link>
                     )}
+                    <div className="border-t border-white/10 my-1"></div>
                     <button
                       onClick={() => {
                         logout();
@@ -210,7 +255,11 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
           ) : (
             <Link 
               to="/auth"
-              className="px-4 py-2 text-sm font-medium text-brand-secondary hover:text-brand-primary transition-colors rounded-full hover:bg-white/10 flex items-center gap-2"
+              className={`px-4 py-2 text-sm font-medium transition-colors rounded-full flex items-center gap-2 ${
+                isHomePage 
+                  ? 'text-white hover:text-white/80 hover:bg-white/20' 
+                  : 'text-brand-secondary hover:text-brand-primary hover:bg-white/10'
+              }`}
               aria-label="Sign in or Sign up"
             >
               <UserIcon className="h-5 w-5" />

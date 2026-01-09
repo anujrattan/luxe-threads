@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import api from '../services/api';
 import { ProductCard } from '../components/ProductCard';
-import { PackageIcon, SparklesIcon } from '../components/icons';
+import { PackageIcon, StarIcon } from '../components/icons';
 import { Button } from '../components/ui';
 
 export const ProductListPage: React.FC = () => {
@@ -95,7 +95,7 @@ export const ProductListPage: React.FC = () => {
               <div className="max-w-md mx-auto">
                 <div className="relative mb-6">
                   <PackageIcon className="w-20 h-20 mx-auto text-brand-secondary opacity-40" />
-                  <SparklesIcon className="w-8 h-8 absolute -top-2 -right-2 text-purple-400 opacity-60 animate-pulse" />
+                  <StarIcon className="w-8 h-8 absolute -top-2 -right-2 text-purple-400 opacity-60 animate-pulse" filled={true} />
                 </div>
                 <h3 className="text-2xl font-display font-semibold text-brand-primary mb-3">
                   Coming Soon to {categoryName}

@@ -4,47 +4,69 @@ interface RotatingTextProps {
   words: string[];
   interval?: number;
   className?: string;
+  typingSpeed?: number; // Speed in ms per character for typing
 }
 
 export const RotatingText: React.FC<RotatingTextProps> = ({ 
   words, 
   interval = 3000,
-  className = '' 
+  className = '',
+  typingSpeed = 100 // Default 100ms per character
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [displayedText, setDisplayedText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Clear any existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+    if (words.length === 0) return;
+
+    const currentWord = words[currentIndex];
+    if (!currentWord) return;
+
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
 
-    // Start the rotation with smooth animation
-    intervalRef.current = setInterval(() => {
-      // Fade out current word smoothly
-      setIsAnimating(true);
+    if (!isDeleting) {
+      // Typing phase: add characters one by one
+      if (displayedText.length < currentWord.length) {
+        timeoutRef.current = setTimeout(() => {
+          setDisplayedText(currentWord.slice(0, displayedText.length + 1));
+        }, typingSpeed);
+      } else {
+        // Word is complete, wait for a pause then start deleting
+        const pauseTime = 1000; // Pause 1 second after word is complete
+        timeoutRef.current = setTimeout(() => {
+          setIsDeleting(true);
+        }, pauseTime);
+      }
+    } else {
+      // Deleting phase: remove characters one by one at double speed
+      const deleteSpeed = typingSpeed / 2; // Double speed
       
-      // After fade out completes (600ms), change word
-      setTimeout(() => {
+      if (displayedText.length > 0) {
+        timeoutRef.current = setTimeout(() => {
+          setDisplayedText(prev => prev.slice(0, -1));
+        }, deleteSpeed);
+      } else {
+        // Text is deleted, move to next word and reset
+        setIsDeleting(false);
+        setDisplayedText(''); // Reset immediately
         setCurrentIndex((prevIndex) => (prevIndex + 1) % words.length);
-        // Immediately start fade in for new word
-        requestAnimationFrame(() => {
-          setIsAnimating(false);
-        });
-      }, 600);
-    }, interval);
+      }
+    }
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-  }, [words.length, interval]);
+  }, [displayedText, isDeleting, currentIndex, words, typingSpeed]);
 
   // Calculate max width based on longest word to prevent layout shift
-  const longestWord = words.reduce((a, b) => a.length > b.length ? a : b);
+  const longestWord = words.reduce((a, b) => a.length > b.length ? a : b, '');
   const maxWidth = longestWord.length * 0.7; // Approximate width in em
 
   return (
@@ -55,19 +77,9 @@ export const RotatingText: React.FC<RotatingTextProps> = ({
         textAlign: 'left'
       }}
     >
-      <span 
-        key={`${currentIndex}-${isAnimating}`}
-        className={`inline-block ${className} transition-all duration-600 ease-in-out ${
-          isAnimating 
-            ? 'opacity-0 transform translate-y-3 scale-98' 
-            : 'opacity-100 transform translate-y-0 scale-100'
-        }`}
-        style={{
-          transitionProperty: 'opacity, transform',
-          transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      >
-        {words[currentIndex]}
+      <span className={`inline-block ${className}`}>
+        {displayedText}
+        <span className="inline-block ml-0.5 align-middle animate-blink">|</span>
       </span>
     </span>
   );

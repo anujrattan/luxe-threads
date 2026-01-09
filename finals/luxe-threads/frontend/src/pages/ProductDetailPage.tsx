@@ -5,10 +5,12 @@ import api from '../services/api';
 import { Button } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
 import { useApp } from '../context/AppContext';
+import { formatCurrency } from '../utils/currency';
+import { getCssColorValue } from '../utils/colorUtils';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { addToCart } = useApp();
+  const { addToCart, currency } = useApp();
   
   // All hooks must be declared before any conditional returns
   const [product, setProduct] = useState<Product | null>(null);
@@ -188,12 +190,12 @@ export const ProductDetailPage: React.FC = () => {
           {/* Price Display */}
           <div className="mt-3 flex items-baseline gap-3">
             <p className="text-3xl font-bold text-pink-500">
-              ${finalPrice.toFixed(2)}
+              {formatCurrency(finalPrice, currency)}
             </p>
             {hasAnyDiscount && (
               <>
                 <p className="text-xl text-brand-secondary line-through">
-                  ${sellingPrice.toFixed(2)}
+                  {formatCurrency(sellingPrice, currency)}
                 </p>
                 <span className="text-lg font-semibold text-pink-500">
                   ({effectiveDiscount.toFixed(0)}% off)
@@ -236,7 +238,8 @@ export const ProductDetailPage: React.FC = () => {
                       >
                         <span 
                           className={`h-8 w-8 rounded-full border border-white/20`} 
-                          style={{ backgroundColor: color }}
+                          style={{ backgroundColor: getCssColorValue(color) }}
+                          title={color}
                         ></span>
                       </button>
                     );

@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   slug: string;
   imageUrl: string;
+  isActive?: boolean;
 }
 
 export interface Product {

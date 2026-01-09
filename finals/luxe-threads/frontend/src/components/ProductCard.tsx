@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Card } from './ui';
 import { RecycleIcon, SaleTagIcon } from './icons';
+import { formatCurrency } from '../utils/currency';
+import { useApp } from '../context/AppContext';
+import { getCssColorValue } from '../utils/colorUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -10,6 +13,8 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const navigate = useNavigate();
+  const { currency } = useApp();
+  const [imageError, setImageError] = useState(false);
   
   // Calculate prices exactly like ProductCardPreview
   const sellingPrice = parseFloat(String(product.selling_price || 0));
@@ -39,27 +44,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     ? product.category.toUpperCase().replace('-', ' ')
     : undefined;
   
-  const discountText = hasAnyDiscount ? `Save $${totalSavings.toFixed(0)}` : undefined;
+  const discountText = hasAnyDiscount ? `Save ${formatCurrency(totalSavings, currency, { showDecimals: false })}` : undefined;
   const uspTag = product.usp_tag || undefined;
 
   return (
     <Card 
-      className="cursor-pointer animate-popIn bg-card-light-bg border-gray-200/50 shadow-md !text-card-light-text-primary max-w-sm" 
+      className="cursor-pointer animate-popIn bg-card-light-bg dark:bg-brand-surface border-gray-200/50 dark:border-white/10 border shadow-md dark:shadow-lg hover:shadow-xl transition-shadow !text-card-light-text-primary dark:text-brand-primary max-w-sm" 
       onClick={() => navigate(`/product/${product.id}`)}
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-xl">
-        {product.main_image_url || product.imageUrl ? (
+        {(product.main_image_url || product.imageUrl) && !imageError ? (
           <img
             src={product.main_image_url || product.imageUrl}
             alt={product.title || product.name || 'Product'}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x500?text=No+Image';
+            onError={() => {
+              // Stop retrying - just mark as error and show fallback
+              setImageError(true);
             }}
+            loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-400 text-sm">No image</span>
+          <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+            <span className="text-gray-400 dark:text-gray-500 text-sm">No image</span>
           </div>
         )}
         {/* Top Left: Discount Pill */}
@@ -99,12 +106,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         
         <div className="flex items-baseline gap-2 mt-1.5">
           <p className="text-2xl font-extrabold text-pink-500">
-            ${finalPrice.toFixed(2)}
+            {formatCurrency(finalPrice, currency)}
           </p>
           {hasAnyDiscount && (
             <div className="flex items-baseline gap-1.5">
               <p className="text-sm text-card-light-text-secondary line-through">
-                ${sellingPrice.toFixed(2)}
+                {formatCurrency(sellingPrice, currency)}
               </p>
               <span className="text-xs font-semibold text-pink-500">
                 ({effectiveDiscount.toFixed(0)}% off)
@@ -117,6 +124,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <div className="mt-2 inline-flex items-center gap-1.5 bg-tag-green-bg text-tag-green-text text-xs font-semibold rounded-full px-2.5 py-1 self-start">
             <RecycleIcon className="w-3 h-3" />
             <span>{uspTag}</span>
+          </div>
+        )}
+        
+        {/* Color Swatches */}
+        {product.variants?.colors && product.variants.colors.length > 0 && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-card-light-text-secondary">Colors:</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {product.variants.colors.slice(0, 6).map((color, index) => (
+                <span
+                  key={index}
+                  className="w-5 h-5 rounded-full border border-gray-300 shadow-sm"
+                  style={{ backgroundColor: getCssColorValue(color) }}
+                  title={color}
+                />
+              ))}
+              {product.variants.colors.length > 6 && (
+                <span className="text-xs text-card-light-text-secondary">
+                  +{product.variants.colors.length - 6}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

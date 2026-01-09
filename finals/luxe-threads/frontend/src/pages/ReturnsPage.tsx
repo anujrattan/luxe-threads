@@ -1,8 +1,11 @@
 import React from 'react';
 import { Undo2Icon, ClockIcon, PackageIcon, MailIcon } from '../components/icons';
 import { Button } from '../components/ui';
+import { formatCurrency } from '../utils/currency';
+import { useApp } from '../context/AppContext';
 
 export const ReturnsPage: React.FC = () => {
+  const { currency } = useApp();
   const returnSteps = [
     {
       icon: <PackageIcon className="w-6 h-6 text-brand-accent" />,
@@ -66,8 +69,8 @@ export const ReturnsPage: React.FC = () => {
                 <li>In the same condition you received it</li>
               </ul>
               <p className="mt-4">
-                <strong className="text-brand-primary">Free returns</strong> are available on orders over $50. 
-                For orders under $50, a $5.99 return shipping fee applies.
+                <strong className="text-brand-primary">Free returns</strong> are available on orders over {formatCurrency(50, currency)}. 
+                For orders under {formatCurrency(50, currency)}, a {formatCurrency(5.99, currency)} return shipping fee applies.
               </p>
             </div>
           </div>

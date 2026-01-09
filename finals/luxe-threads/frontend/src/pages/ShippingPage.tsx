@@ -1,22 +1,25 @@
 import React from 'react';
 import { TruckIcon, ClockIcon, GlobeIcon, PackageIcon } from '../components/icons';
+import { formatCurrency } from '../utils/currency';
+import { useApp } from '../context/AppContext';
 
 export const ShippingPage: React.FC = () => {
+  const { currency } = useApp();
   const shippingOptions = [
     {
       icon: <TruckIcon className="w-8 h-8 text-brand-accent" />,
       title: 'Standard Shipping',
       duration: '5-7 Business Days',
-      price: '$5.99',
-      freeThreshold: 'Free on orders over $50',
+      price: formatCurrency(5.99, currency),
+      freeThreshold: `Free on orders over ${formatCurrency(50, currency)}`,
       description: 'Our standard shipping option delivers your order safely and securely.'
     },
     {
       icon: <ClockIcon className="w-8 h-8 text-brand-accent" />,
       title: 'Express Shipping',
       duration: '2-3 Business Days',
-      price: '$14.99',
-      freeThreshold: 'Free on orders over $100',
+      price: formatCurrency(14.99, currency),
+      freeThreshold: `Free on orders over ${formatCurrency(100, currency)}`,
       description: 'Need it faster? Express shipping gets your order to you quickly.'
     },
     {
@@ -24,7 +27,7 @@ export const ShippingPage: React.FC = () => {
       title: 'International Shipping',
       duration: '7-14 Business Days',
       price: 'Varies by location',
-      freeThreshold: 'Free on orders over $150',
+      freeThreshold: `Free on orders over ${formatCurrency(150, currency)}`,
       description: 'We ship worldwide! International orders may be subject to customs fees.'
     }
   ];

@@ -2,15 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { TrashIcon, PlusIcon, MinusIcon } from '../components/icons';
-import { TAX_RATE } from '../utils/constants';
 import { useApp } from '../context/AppContext';
+import { formatCurrency } from '../utils/currency';
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate();
-  const { cart, updateQuantity, removeFromCart } = useApp();
+  const { cart, updateQuantity, removeFromCart, currency } = useApp();
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const taxes = subtotal * TAX_RATE;
-  const total = subtotal + taxes;
+  // Prices shown to customers are tax-inclusive. We don't add extra tax on top.
+  const total = subtotal;
 
   if (cart.length === 0) {
     return (
@@ -37,7 +37,7 @@ export const CartPage: React.FC = () => {
                   <div>
                     <div className="flex justify-between text-base font-medium text-brand-primary">
                       <h3>{item.name}</h3>
-                      <p className="ml-4">${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="ml-4">{formatCurrency(item.price * item.quantity, currency)}</p>
                     </div>
                     <p className="mt-1 text-sm text-brand-secondary">{item.selectedColor} / {item.selectedSize}</p>
                   </div>
@@ -71,15 +71,14 @@ export const CartPage: React.FC = () => {
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-brand-secondary">Subtotal</p>
-                <p className="text-sm font-medium text-brand-primary">${subtotal.toFixed(2)}</p>
+                <p className="text-sm font-medium text-brand-primary">{formatCurrency(subtotal, currency)}</p>
               </div>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-brand-secondary">Taxes</p>
-                <p className="text-sm font-medium text-brand-primary">${taxes.toFixed(2)}</p>
-              </div>
+              <p className="text-xs text-brand-secondary">
+                Prices shown are inclusive of all applicable GST.
+              </p>
               <div className="flex items-center justify-between border-t border-white/10 pt-4">
                 <p className="text-base font-medium text-brand-primary">Order total</p>
-                <p className="text-base font-medium text-brand-primary">${total.toFixed(2)}</p>
+                <p className="text-base font-medium text-brand-primary">{formatCurrency(total, currency)}</p>
               </div>
             </div>
             <Button onClick={() => navigate('/checkout')} className="w-full mt-6">

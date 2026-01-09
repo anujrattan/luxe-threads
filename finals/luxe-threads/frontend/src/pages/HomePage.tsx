@@ -7,13 +7,14 @@ import { Button } from "../components/ui";
 import {
   StarIcon,
   TruckIcon,
-  SparklesIcon,
+  TrendingUpIcon,
   Undo2Icon,
   ArrowRightIcon,
   FlameIcon,
   SmileIcon,
   MessageCircleIcon,
   ShoppingBagIcon,
+  PackageIcon,
 } from "../components/icons";
 import { RotatingText } from "../components/RotatingText";
 
@@ -53,7 +54,7 @@ export const HomePage: React.FC = () => {
 
   const benefits = [
     {
-      icon: <SparklesIcon className="w-8 h-8 text-brand-accent" />,
+      icon: <PackageIcon className="w-8 h-8 text-brand-accent" />,
       title: "Premium Fabrics",
       description:
         "We source only the finest materials for a difference you can feel.",
@@ -73,29 +74,29 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="pt-4 space-y-16 md:space-y-24 animate-fadeIn pb-16">
+    <div className="space-y-8 md:space-y-12 animate-fadeIn pb-16">
       {/* Hero Section */}
       <section
-        className="relative h-[60vh] md:h-[85vh] bg-cover bg-center"
+        className="relative h-[70vh] md:h-[90vh] bg-cover bg-center -mt-2"
         style={{
           backgroundImage:
             "url('https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop')",
         }}
       >
-        <div className="absolute inset-0 bg-brand-bg/60"></div>
-        <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col items-start justify-center text-brand-primary">
+        <div className="absolute inset-0 bg-brand-bg/60 dark:bg-brand-bg/60 bg-black/50"></div>
+        <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col items-start justify-center">
           <div className="max-w-3xl">
-            <h1 className="text-5xl md:text-8xl font-display font-extrabold tracking-tight leading-tight">
+            <h1 className="text-5xl md:text-8xl font-display font-extrabold tracking-tight leading-tight text-white">
               <span className="block">Wear Your</span>
               <span className="block">
                 <RotatingText
                   words={["Style", "Energy", "Essence"]}
                   interval={3000}
-                  className="bg-gradient-to-r from-purple-400 via-pink-500 to-purple-600 bg-clip-text text-transparent"
+                  className="bg-gradient-to-r from-[#9333EA] to-[#F5E04E] bg-clip-text text-transparent"
                 />
               </span>
             </h1>
-            <p className="mt-6 text-xl md:text-2xl max-w-2xl font-sans text-brand-secondary leading-relaxed">
+            <p className="mt-6 text-xl md:text-2xl max-w-2xl font-sans text-white/90 leading-relaxed">
               Premium threads that match your energy. Quality fabrics, curated
               designs, zero compromise.
             </p>
@@ -115,8 +116,8 @@ export const HomePage: React.FC = () => {
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <SparklesIcon className="w-5 h-5 text-yellow-400" />
-            <span className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">
+            <TrendingUpIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
               Top Picks
             </span>
           </div>
@@ -144,8 +145,8 @@ export const HomePage: React.FC = () => {
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <FlameIcon className="w-5 h-5 text-orange-500" />
-            <span className="text-sm font-semibold text-orange-500 uppercase tracking-wider">
+            <FlameIcon className="w-5 h-5 text-orange-500 dark:text-orange-500 text-orange-600" />
+            <span className="text-sm font-semibold text-orange-500 dark:text-orange-500 text-orange-600 uppercase tracking-wider">
               Just In
             </span>
           </div>
@@ -179,8 +180,8 @@ export const HomePage: React.FC = () => {
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <FlameIcon className="w-5 h-5 text-orange-500" />
-            <span className="text-sm font-semibold text-orange-500 uppercase tracking-wider">
+            <FlameIcon className="w-5 h-5 text-orange-500 dark:text-orange-500 text-orange-600" />
+            <span className="text-sm font-semibold text-orange-500 dark:text-orange-500 text-orange-600 uppercase tracking-wider">
               Trending Now
             </span>
           </div>
@@ -273,7 +274,7 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* Benefits Section */}
-      <section className="bg-brand-surface/50">
+      <section className="bg-brand-surface/50 dark:bg-brand-surface/50 bg-gray-50">
         <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
             {benefits.map((benefit) => (
@@ -292,7 +293,7 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="bg-brand-surface/30 py-12">
+      <section className="bg-brand-surface/30 dark:bg-brand-surface/30 bg-gray-100 py-12">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="flex flex-col items-center gap-1">
@@ -328,11 +329,11 @@ export const HomePage: React.FC = () => {
           {testimonials.map((testimonial) => (
             <div
               key={testimonial.name}
-              className="bg-brand-surface p-6 rounded-xl border border-white/10"
+              className="bg-brand-surface dark:bg-brand-surface bg-white p-6 rounded-xl border border-white/10 dark:border-white/10 border-gray-200 shadow-md"
             >
               <div className="flex items-center">
                 {Array.from({ length: testimonial.rating }).map((_, i) => (
-                  <StarIcon key={i} className="w-5 h-5 text-yellow-400" />
+                  <StarIcon key={i} className="w-5 h-5 text-yellow-400 dark:text-yellow-400 text-yellow-500" />
                 ))}
               </div>
               <p className="mt-4 text-brand-secondary">"{testimonial.text}"</p>

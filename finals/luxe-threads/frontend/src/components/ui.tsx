@@ -1,4 +1,5 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState, useRef, useEffect } from 'react';
+import { ChevronDownIcon } from './icons';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
@@ -57,4 +58,129 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 );
 
 Input.displayName = 'Input';
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface SelectProps {
+  options: SelectOption[];
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+export const Select: React.FC<SelectProps> = ({
+  options,
+  value,
+  onChange,
+  className = '',
+  placeholder = 'Select...',
+  disabled = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={selectRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium rounded-lg border border-white/20 bg-brand-surface text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+          isOpen ? 'border-brand-accent/50' : 'hover:border-white/30'
+        }`}
+      >
+        <span className={selectedOption ? 'text-brand-primary' : 'text-brand-secondary'}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDownIcon className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-full z-50">
+          <div className="bg-brand-surface rounded-xl border border-white/10 shadow-xl overflow-hidden">
+            <div className="py-2 max-h-60 overflow-y-auto">
+              {options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelect(option.value)}
+                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                    option.value === value
+                      ? 'text-brand-primary bg-white/10'
+                      : 'text-brand-secondary hover:text-brand-primary hover:bg-white/5'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ToggleProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+export const Toggle: React.FC<ToggleProps> = ({
+  checked,
+  onChange,
+  disabled = false,
+  className = '',
+}) => {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked ? 'bg-brand-accent' : 'bg-gray-300 dark:bg-gray-600'
+      } ${className}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+  );
+};
 

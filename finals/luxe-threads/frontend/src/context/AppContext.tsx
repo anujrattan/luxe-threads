@@ -9,6 +9,32 @@ import { CartItem } from '../types';
 import { CART_STORAGE_KEY } from '../utils/constants';
 import { authService } from '../services/auth';
 import api from '../services/api';
+import { CurrencyCode, getStoredCurrency, saveCurrencyPreference } from '../utils/currency';
+import { isCategoryAllowed } from '../utils/cookieConsent';
+
+type Theme = 'dark' | 'light';
+const THEME_STORAGE_KEY = 'luxe-threads-theme';
+
+const getStoredTheme = (): Theme => {
+  if (typeof window === 'undefined') return 'dark';
+  const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
+  return stored === 'light' || stored === 'dark' ? stored : 'dark';
+};
+
+const saveThemePreference = (theme: Theme) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    // Update document class for Tailwind dark mode
+    const htmlElement = document.documentElement;
+    if (theme === 'dark') {
+      htmlElement.classList.add('dark');
+    } else {
+      htmlElement.classList.remove('dark');
+    }
+    // Force a reflow to ensure CSS variables update
+    void htmlElement.offsetHeight;
+  }
+};
 
 interface User {
   id: string;
@@ -31,6 +57,11 @@ interface AppContextType {
   isAdmin: boolean;
   setUser: (user: User | null) => void;
   logout: () => void;
+  currency: CurrencyCode;
+  setCurrency: (currency: CurrencyCode) => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -54,6 +85,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   });
   const [user, setUser] = useState<User | null>(null);
   const [cartAnimationKey, setCartAnimationKey] = useState(0);
+  const [currency, setCurrencyState] = useState<CurrencyCode>(() => getStoredCurrency());
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const storedTheme = getStoredTheme();
+    // Initialize document class on mount - must happen synchronously
+    if (typeof window !== 'undefined') {
+      const htmlElement = document.documentElement;
+      if (storedTheme === 'dark') {
+        htmlElement.classList.add('dark');
+      } else {
+        htmlElement.classList.remove('dark');
+      }
+      localStorage.setItem(THEME_STORAGE_KEY, storedTheme);
+    }
+    return storedTheme;
+  });
 
   // Logout function (defined early for use in useEffect)
   const logout = React.useCallback(() => {
@@ -99,6 +145,52 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   }, [cart]);
+
+  // Save currency preference when it changes
+  useEffect(() => {
+    saveCurrencyPreference(currency);
+  }, [currency]);
+
+  // Currency setter that updates both state and localStorage
+  const setCurrency = React.useCallback((newCurrency: CurrencyCode) => {
+    setCurrencyState(newCurrency);
+    saveCurrencyPreference(newCurrency);
+  }, []);
+
+  // Sync theme changes to DOM
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Only persist theme to localStorage if functional cookies are allowed
+      if (isCategoryAllowed('functional')) {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+      }
+      
+      const htmlElement = document.documentElement;
+      
+      // Toggle dark class: dark theme = has class, light theme = no class
+      if (theme === 'dark') {
+        htmlElement.classList.add('dark');
+      } else {
+        htmlElement.classList.remove('dark');
+      }
+      
+      // Force a reflow to ensure CSS variables update
+      void htmlElement.offsetHeight;
+    }
+  }, [theme]);
+
+  // Theme setter that updates both state and localStorage
+  const setTheme = React.useCallback((newTheme: Theme) => {
+    setThemeState(newTheme);
+  }, []);
+
+  // Toggle theme helper - use functional update to avoid stale closure
+  const toggleTheme = React.useCallback(() => {
+    setThemeState((currentTheme) => {
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      return newTheme;
+    });
+  }, []);
 
   const addToCart = (itemToAdd: CartItem) => {
     setCart(prevCart => {
@@ -154,6 +246,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         isAdmin,
         setUser,
         logout,
+        currency,
+        setCurrency,
+        theme,
+        setTheme,
+        toggleTheme,
       }}
     >
       {children}

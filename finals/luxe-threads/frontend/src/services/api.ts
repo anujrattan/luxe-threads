@@ -257,6 +257,18 @@ const api = {
     }
   },
 
+  // Get all categories including inactive (admin only)
+  getAllCategoriesAdmin: async (): Promise<Category[]> => {
+    return apiCall('/categories/admin/all');
+  },
+
+  // Toggle category active status (admin only)
+  toggleCategoryActive: async (id: string): Promise<Category> => {
+    return apiCall(`/categories/${id}/toggle-active`, {
+      method: 'PATCH',
+    });
+  },
+
   createCategory: async (categoryData: Omit<Category, 'id'>): Promise<Category> => {
     return apiCall('/categories', {
       method: 'POST',
@@ -277,10 +289,77 @@ const api = {
     });
   },
 
-  submitOrder: async (orderDetails: any): Promise<{ success: boolean; orderId: string }> => {
-    await new Promise(res => setTimeout(res, 1000));
-    console.log('Order submitted:', orderDetails);
-    return { success: true, orderId: `ORD-${Date.now()}` };
+  submitOrder: async (orderDetails: any, gateway: 'COD' | 'Prepaid' = 'COD'): Promise<{ success: boolean; orderId?: string; orderNumber?: string; message?: string; razorpay?: any }> => {
+    try {
+      const { customer, items, total } = orderDetails;
+      
+      // Use firstName and lastName directly from form (now captured separately)
+      const firstName = customer.firstName || customer.first_name || '';
+      const lastName = customer.lastName || customer.last_name || '';
+      
+      // Fallback: if name field exists (for backward compatibility), split it
+      const nameParts = (customer.name || '').trim().split(' ');
+      const finalFirstName = firstName || nameParts[0] || '';
+      const finalLastName = lastName || nameParts.slice(1).join(' ') || '';
+      
+      // Calculate amounts (all prices are tax-inclusive on the frontend)
+      const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+      const shippingCost = 0; // TODO: Implement shipping cost calculation if needed
+      // For new logic, we don't pre-compute tax on the frontend; backend/admin will reverse-calc GST.
+      const taxAmount = 0;
+      
+      // Map cart items to line items format expected by backend
+      const lineItems = items.map((item: any) => ({
+        productId: item.id,
+        size: item.selectedSize,
+        color: item.selectedColor,
+        quantity: item.quantity,
+        price: item.price, // Unit price
+      }));
+      
+      // Prepare order payload
+      const orderPayload = {
+        userEmail: customer.email,
+        userName: `${finalFirstName} ${finalLastName}`.trim(), // Full name for display
+        lineItems: lineItems,
+        shippingAddress: {
+          firstName: finalFirstName,
+          lastName: finalLastName,
+          email: customer.email,
+          phone: customer.phone || '',
+          address1: customer.address,
+          address2: customer.address2 || '',
+          city: customer.city,
+          province: customer.state || '',
+          zip: customer.zip,
+          countryCode: 'IN', // Default to India
+        },
+        subtotal: subtotal,
+        taxAmount: taxAmount,
+        shippingCost: shippingCost,
+        totalAmount: total,
+        gateway: gateway,
+      };
+      
+      const response = await apiCall('/orders', {
+        method: 'POST',
+        body: JSON.stringify(orderPayload),
+      });
+      
+      return {
+        success: true,
+        orderId: response.order?.id,
+        orderNumber: response.order?.order_number,
+        message: response.message || 'Order placed successfully',
+        razorpay: response.razorpay || null,
+      };
+    } catch (error: any) {
+      console.error('Error submitting order:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to place order. Please try again.',
+      };
+    }
   },
 
   getBestSellers: async (): Promise<Product[]> => {
@@ -301,12 +380,121 @@ const api = {
     );
   },
 
-  getSaleItems: async (): Promise<Product[]> => {
-    await new Promise(res => setTimeout(res, 300));
-    // Filter products with discount or originalPrice
-    return products.filter(p => p.discount || p.originalPrice);
-  },
-};
+      getSaleItems: async (): Promise<Product[]> => {
+        await new Promise(res => setTimeout(res, 300));
+        // Filter products with discount or originalPrice
+        return products.filter(p => p.discount || p.originalPrice);
+      },
+      // Orders
+      getOrders: async (status?: string, limit?: number, offset?: number): Promise<{ success: boolean; orders: any[]; total: number }> => {
+        const params = new URLSearchParams();
+        if (status) params.append('status', status);
+        if (limit) params.append('limit', limit.toString());
+        if (offset) params.append('offset', offset.toString());
+        const queryString = params.toString();
+        return apiCall(`/orders${queryString ? `?${queryString}` : ''}`);
+      },
 
-export default api;
+      getOrderByNumber: async (orderNumber: string, email?: string): Promise<any> => {
+        const params = new URLSearchParams();
+        if (email) params.append('email', email);
+        const queryString = params.toString();
+        return apiCall(`/orders/${orderNumber}${queryString ? `?${queryString}` : ''}`);
+      },
+
+      lookupOrder: async (orderNumber: string, email: string): Promise<any> => {
+        return apiCall('/orders/lookup', {
+          method: 'POST',
+          body: JSON.stringify({ orderNumber, email }),
+        });
+      },
+
+      updateOrderStatus: async (orderNumber: string, status: string, notes?: string): Promise<any> => {
+        return apiCall(`/orders/${orderNumber}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status, notes }),
+        });
+      },
+
+      updateOrderFulfillmentPartner: async (orderNumber: string, fulfillment_partner: string | null): Promise<any> => {
+        return apiCall(`/orders/${orderNumber}/fulfillment-partner`, {
+          method: 'PUT',
+          body: JSON.stringify({ fulfillment_partner }),
+        });
+      },
+
+      updateOrderPartnerOrderId: async (orderNumber: string, partner_order_id: string | null): Promise<any> => {
+        return apiCall(`/orders/${orderNumber}/partner-order-id`, {
+          method: 'PUT',
+          body: JSON.stringify({ partner_order_id }),
+        });
+      },
+
+      // Users
+      getUserProfile: async (): Promise<any> => {
+        return apiCall('/users/profile');
+      },
+
+      getUserOrders: async (): Promise<any> => {
+        return apiCall('/users/orders');
+      },
+
+      createAddress: async (addressData: any): Promise<any> => {
+        return apiCall('/users/addresses', {
+          method: 'POST',
+          body: JSON.stringify(addressData),
+        });
+      },
+
+      updateAddress: async (addressId: string, addressData: any): Promise<any> => {
+        return apiCall(`/users/addresses/${addressId}`, {
+          method: 'PUT',
+          body: JSON.stringify(addressData),
+        });
+      },
+
+      deleteAddress: async (addressId: string): Promise<any> => {
+        return apiCall(`/users/addresses/${addressId}`, {
+          method: 'DELETE',
+        });
+      },
+
+      setPrimaryAddress: async (addressId: string): Promise<any> => {
+        return apiCall(`/users/addresses/${addressId}/set-primary`, {
+          method: 'PUT',
+        });
+      },
+
+      // Analytics (admin)
+      getAnalyticsOverview: async (params: { from?: string; to?: string; granularity?: 'day' | 'week' | 'month' } = {}): Promise<any> => {
+        const search = new URLSearchParams();
+        if (params.from) search.append('from', params.from);
+        if (params.to) search.append('to', params.to);
+        if (params.granularity) search.append('granularity', params.granularity);
+        const queryString = search.toString();
+        return apiCall(`/analytics/overview${queryString ? `?${queryString}` : ''}`);
+      },
+
+      // Payments
+      createRazorpayOrder: async (orderId: string, orderNumber: string, amount: number): Promise<any> => {
+        return apiCall('/payments/create-order', {
+          method: 'POST',
+          body: JSON.stringify({ orderId, orderNumber, amount }),
+        });
+      },
+
+      verifyPayment: async (orderId: string, razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string): Promise<any> => {
+        return apiCall('/payments/verify', {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId,
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+          }),
+        });
+      },
+    };
+
+    export default api;
 

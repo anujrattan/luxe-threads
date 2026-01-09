@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { HelpCircleIcon, ChevronDownIcon } from '../components/icons';
+import { formatCurrency } from '../utils/currency';
+import { useApp } from '../context/AppContext';
 
 export const FAQPage: React.FC = () => {
+  const { currency } = useApp();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const faqs = [
     {
       question: 'What is your return policy?',
-      answer: 'We offer a 30-day return policy on all items. Items must be unworn, unwashed, and in original packaging with tags attached. Returns are free for orders over $50.'
+      answer: `We offer a 30-day return policy on all items. Items must be unworn, unwashed, and in original packaging with tags attached. Returns are free for orders over ${formatCurrency(50, currency)}.`
     },
     {
       question: 'How long does shipping take?',
