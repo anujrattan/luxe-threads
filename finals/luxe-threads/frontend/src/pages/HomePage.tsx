@@ -17,19 +17,28 @@ import {
   PackageIcon,
 } from "../components/icons";
 import { RotatingText } from "../components/RotatingText";
+import { TestimonialsCarousel } from "../components/TestimonialsCarousel";
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
+  const [hasMoreBestSellers, setHasMoreBestSellers] = useState(false);
+  const [hasMoreNewArrivals, setHasMoreNewArrivals] = useState(false);
 
   useEffect(() => {
     const fetchFeatured = async () => {
-      const allProducts = await api.getProducts();
-      setFeaturedProducts(allProducts.slice(0, 4));
+      const displayLimit = 8;
+      
+      // Fetch Best Sellers (fetch one extra to check if there are more)
+      const bestSellers = await api.getBestSellers(displayLimit + 1);
+      setFeaturedProducts(bestSellers.slice(0, displayLimit));
+      setHasMoreBestSellers(bestSellers.length > displayLimit);
 
-      const arrivals = await api.getNewArrivals();
-      setNewArrivals(arrivals.slice(0, 4));
+      // Fetch New Arrivals (fetch one extra to check if there are more)
+      const arrivals = await api.getNewArrivals(displayLimit + 1);
+      setNewArrivals(arrivals.slice(0, displayLimit));
+      setHasMoreNewArrivals(arrivals.length > displayLimit);
     };
     fetchFeatured();
   }, []);
@@ -114,56 +123,86 @@ export const HomePage: React.FC = () => {
 
       {/* Best Sellers */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUpIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
-              Top Picks
-            </span>
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUpIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <span className="text-sm font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                Top Picks
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-brand-primary">
+              Best{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                Sellers
+              </span>
+            </h2>
+            <p className="mt-2 text-brand-secondary font-sans">
+              Discover the pieces everyone is talking about.
+            </p>
           </div>
-          <h2
-            className="text-3xl md:text-4xl font-display font-bold tracking-tight text-brand-primary cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => navigate("/best-sellers")}
-          >
-            Best{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-              Sellers
-            </span>
-          </h2>
-          <p className="mt-2 text-brand-secondary font-sans">
-            Discover the pieces everyone is talking about.
-          </p>
+          {hasMoreBestSellers && (
+            <Button
+              onClick={() => navigate("/best-sellers")}
+              variant="outline"
+              className="hidden sm:flex items-center gap-2"
+            >
+              Show All
+              <ArrowRightIcon className="w-4 h-4" />
+            </Button>
+          )}
         </div>
-        <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 gap-x-6">
+        <div className="grid grid-cols-2 gap-y-6 gap-x-4 sm:gap-y-10 sm:gap-x-6 lg:grid-cols-4">
           {featuredProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
+        {hasMoreBestSellers && (
+          <div className="mt-6 sm:hidden flex justify-center">
+            <Button
+              onClick={() => navigate("/best-sellers")}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              Show All
+              <ArrowRightIcon className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* New Arrivals */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <FlameIcon className="w-5 h-5 text-orange-500 dark:text-orange-500 text-orange-600" />
-            <span className="text-sm font-semibold text-orange-500 dark:text-orange-500 text-orange-600 uppercase tracking-wider">
-              Just In
-            </span>
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <FlameIcon className="w-5 h-5 text-orange-500 dark:text-orange-500 text-orange-600" />
+              <span className="text-sm font-semibold text-orange-500 dark:text-orange-500 text-orange-600 uppercase tracking-wider">
+                Just In
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-brand-primary">
+              New{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                Arrivals
+              </span>
+            </h2>
+            <p className="mt-2 text-brand-secondary font-sans">
+              Be the first to discover our latest additions.
+            </p>
           </div>
-          <h2
-            className="text-3xl md:text-4xl font-display font-bold tracking-tight text-brand-primary cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => navigate("/new-arrivals")}
-          >
-            New{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-              Arrivals
-            </span>
-          </h2>
-          <p className="mt-2 text-brand-secondary font-sans">
-            Be the first to discover our latest additions.
-          </p>
+          {hasMoreNewArrivals && newArrivals.length > 0 && (
+            <Button
+              onClick={() => navigate("/new-arrivals")}
+              variant="outline"
+              className="hidden sm:flex items-center gap-2"
+            >
+              Show All
+              <ArrowRightIcon className="w-4 h-4" />
+            </Button>
+          )}
         </div>
-        <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 gap-x-6">
+        <div className="grid grid-cols-2 gap-y-6 gap-x-4 sm:gap-y-10 sm:gap-x-6 lg:grid-cols-4">
           {newArrivals.length > 0 ? (
             newArrivals.map((product) => (
               <ProductCard key={product.id} product={product} />
@@ -174,23 +213,45 @@ export const HomePage: React.FC = () => {
             </div>
           )}
         </div>
+        {hasMoreNewArrivals && newArrivals.length > 0 && (
+          <div className="mt-6 sm:hidden flex justify-center">
+            <Button
+              onClick={() => navigate("/new-arrivals")}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              Show All
+              <ArrowRightIcon className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Trending Collections */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <FlameIcon className="w-5 h-5 text-orange-500 dark:text-orange-500 text-orange-600" />
-            <span className="text-sm font-semibold text-orange-500 dark:text-orange-500 text-orange-600 uppercase tracking-wider">
-              Trending Now
-            </span>
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <FlameIcon className="w-5 h-5 text-orange-500 dark:text-orange-500 text-orange-600" />
+              <span className="text-sm font-semibold text-orange-500 dark:text-orange-500 text-orange-600 uppercase tracking-wider">
+                Trending Now
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-brand-primary">
+              Shop by{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+                Collection
+              </span>
+            </h2>
           </div>
-          <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-brand-primary">
-            Shop by{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-              Collection
-            </span>
-          </h2>
+          <Button
+            onClick={() => navigate("/categories")}
+            variant="outline"
+            className="hidden sm:flex items-center gap-2"
+          >
+            Show All
+            <ArrowRightIcon className="w-4 h-4" />
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -271,19 +332,29 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
         </div>
+        <div className="mt-6 sm:hidden flex justify-center">
+          <Button
+            onClick={() => navigate("/categories")}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            Show All Categories
+            <ArrowRightIcon className="w-4 h-4" />
+          </Button>
+        </div>
       </section>
 
       {/* Benefits Section */}
       <section className="bg-brand-surface/50 dark:bg-brand-surface/50 bg-gray-50">
-        <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+        <div className="container mx-auto px-4 py-8 md:py-16 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 text-center">
             {benefits.map((benefit) => (
               <div key={benefit.title} className="flex flex-col items-center">
                 <div className="flex-shrink-0">{benefit.icon}</div>
-                <h3 className="mt-4 text-xl font-display font-semibold text-brand-primary">
+                <h3 className="mt-3 md:mt-4 text-lg md:text-xl font-display font-semibold text-brand-primary">
                   {benefit.title}
                 </h3>
-                <p className="mt-2 text-brand-secondary">
+                <p className="mt-1 md:mt-2 text-sm md:text-base text-brand-secondary">
                   {benefit.description}
                 </p>
               </div>
@@ -293,9 +364,9 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="bg-brand-surface/30 dark:bg-brand-surface/30 bg-gray-100 py-12">
+      <section className="bg-brand-surface/30 dark:bg-brand-surface/30 bg-gray-100 py-6 md:py-12">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 text-center">
             <div className="flex flex-col items-center gap-1">
               <SmileIcon className="w-8 h-8 text-brand-accent" />
               <p className="font-bold text-xl text-brand-primary">50K+</p>
@@ -321,28 +392,11 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-center text-brand-primary">
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <h2 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-center text-brand-primary mb-8">
           What Our Customers Say
         </h2>
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial) => (
-            <div
-              key={testimonial.name}
-              className="bg-brand-surface dark:bg-brand-surface bg-white p-6 rounded-xl border border-white/10 dark:border-white/10 border-gray-200 shadow-md"
-            >
-              <div className="flex items-center">
-                {Array.from({ length: testimonial.rating }).map((_, i) => (
-                  <StarIcon key={i} className="w-5 h-5 text-yellow-400 dark:text-yellow-400 text-yellow-500" />
-                ))}
-              </div>
-              <p className="mt-4 text-brand-secondary">"{testimonial.text}"</p>
-              <p className="mt-4 font-semibold text-brand-primary">
-                - {testimonial.name}
-              </p>
-            </div>
-          ))}
-        </div>
+        <TestimonialsCarousel testimonials={testimonials} />
       </section>
     </div>
   );

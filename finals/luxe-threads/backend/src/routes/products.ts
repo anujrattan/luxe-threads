@@ -274,6 +274,160 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// Get best sellers (based on revenue from last 30 days)
+router.get('/best-sellers', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 8;
+    
+    // Try to get from cache first
+    const cacheKey = 'orders:last30days';
+    let ordersData = await cache.get(cacheKey);
+    
+    if (!ordersData) {
+      // Calculate date 30 days ago
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      // Fetch orders from last 30 days with order items
+      const { data: orders, error } = await supabaseAdmin
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          order_items (
+            product_id,
+            quantity,
+            unit_price
+          )
+        `)
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .eq('status', 'delivered'); // Only count delivered orders
+      
+      if (error) throw error;
+      
+      ordersData = orders || [];
+      
+      // Cache for 24 hours (86400 seconds)
+      await cache.set(cacheKey, JSON.stringify(ordersData), 86400);
+    } else {
+      ordersData = JSON.parse(ordersData as string);
+    }
+    
+    // Calculate revenue per product
+    const productRevenue: Record<string, number> = {};
+    
+    for (const order of ordersData as any[]) {
+      if (order.order_items && Array.isArray(order.order_items)) {
+        for (const item of order.order_items) {
+          const productId = item.product_id;
+          const revenue = item.quantity * item.unit_price;
+          
+          if (!productRevenue[productId]) {
+            productRevenue[productId] = 0;
+          }
+          productRevenue[productId] += revenue;
+        }
+      }
+    }
+    
+    // Sort products by revenue and get top products
+    const sortedProducts = Object.entries(productRevenue)
+      .sort(([, revenueA], [, revenueB]) => revenueB - revenueA)
+      .slice(0, limit)
+      .map(([productId]) => productId);
+    
+    if (sortedProducts.length === 0) {
+      // No sales data yet, return newest products as fallback
+      console.log('No sales data for best sellers, returning newest products as fallback');
+      const { data: fallbackProducts, error: fallbackError } = await supabaseAdmin
+        .from('products')
+        .select(`
+          *,
+          categories:category_id (
+            id,
+            name,
+            slug
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (fallbackError) throw fallbackError;
+      
+      const transformed = (fallbackProducts || []).map(p => {
+        const transformed = transformProduct(p, p.categories);
+        console.log(`Product: ${transformed.title}, selling_price: ${transformed.selling_price}, price: ${transformed.price}`);
+        return transformed;
+      });
+      return res.json(transformed);
+    }
+    
+    // Fetch full product details for best sellers
+    const { data: products, error: productsError } = await supabaseAdmin
+      .from('products')
+      .select(`
+        *,
+        categories:category_id (
+          id,
+          name,
+          slug
+        )
+      `)
+      .in('id', sortedProducts);
+    
+    if (productsError) throw productsError;
+    
+    // Sort products by revenue ranking
+    const sortedProductDetails = sortedProducts
+      .map(id => products?.find(p => p.id === id))
+      .filter(Boolean)
+      .map(p => {
+        const transformed = transformProduct(p, p.categories);
+        console.log(`Best Seller: ${transformed.title}, selling_price: ${transformed.selling_price}, price: ${transformed.price}`);
+        return transformed;
+      });
+    
+    res.json(sortedProductDetails);
+  } catch (error: any) {
+    console.error('Error fetching best sellers:', error);
+    next(error);
+  }
+});
+
+// Get new arrivals (based on created_at)
+router.get('/new-arrivals', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 8;
+    
+    // Fetch newest products
+    const { data: products, error } = await supabaseAdmin
+      .from('products')
+      .select(`
+        *,
+        categories:category_id (
+          id,
+          name,
+          slug
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    
+    const transformed = (products || []).map(p => {
+      const transformed = transformProduct(p, p.categories);
+      console.log(`New Arrival: ${transformed.title}, selling_price: ${transformed.selling_price}, price: ${transformed.price}`);
+      return transformed;
+    });
+    
+    res.json(transformed);
+  } catch (error: any) {
+    console.error('Error fetching new arrivals:', error);
+    next(error);
+  }
+});
+
 // Get product by ID (public) - with caching
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

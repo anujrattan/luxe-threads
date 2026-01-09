@@ -17,7 +17,7 @@ export const Footer: React.FC = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
 
         {/* Top Section: Links & Newsletter */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
           
           {/* Column 1: Brand Info */}
           <div className="flex flex-col">
@@ -38,8 +38,61 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Column 2: Shop */}
-          <div>
+          {/* Mobile: Shop & Support in 2 columns */}
+          <div className="grid grid-cols-2 gap-6 md:hidden col-span-1">
+            {/* Column 2: Shop */}
+            <div>
+              <h4 className="font-display font-bold text-brand-primary text-base mb-3 flex items-center gap-1.5"><ZapIcon className="w-4 h-4 text-brand-accent" /> Shop</h4>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-1.5">
+                  <FlameIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/new-arrivals" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">New Arrivals</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <TrendingUpIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/best-sellers" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">Best Sellers</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <TagIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/sale" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">Sale Items</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Wand2Icon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/categories" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">All Products</Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Support */}
+            <div>
+              <h4 className="font-display font-bold text-brand-primary text-base mb-3 flex items-center gap-1.5"><HeartIcon className="w-4 h-4 text-brand-accent" /> Support</h4>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-1.5">
+                  <RulerIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/size-guide" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">Size Guide</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <TruckIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/shipping" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">Shipping Info</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Undo2Icon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/return-policy" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">Return Policy</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <HelpCircleIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/faq" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">FAQ</Link>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <TruckIcon className="w-3.5 h-3.5 text-brand-secondary"/>
+                  <Link to="/guest-order-lookup" className="hover:text-brand-primary transition-colors cursor-pointer text-sm">Track Order</Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Desktop: Shop */}
+          <div className="hidden md:block">
             <h4 className="font-display font-bold text-brand-primary text-lg mb-4 flex items-center gap-2"><ZapIcon className="w-5 h-5 text-brand-accent" /> Shop</h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-2">
@@ -61,8 +114,8 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Column 3: Support */}
-          <div>
+          {/* Desktop: Support */}
+          <div className="hidden md:block">
             <h4 className="font-display font-bold text-brand-primary text-lg mb-4 flex items-center gap-2"><HeartIcon className="w-5 h-5 text-brand-accent" /> Support</h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-2">
@@ -89,17 +142,17 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Column 4: Newsletter */}
-          <div>
+          <div className="md:col-span-2 lg:col-span-1">
             <h4 className="font-display font-bold text-brand-primary text-lg mb-4 flex items-center gap-2"><MailIcon className="w-5 h-5 text-brand-accent" /> Stay Updated</h4>
             <p className="text-sm mb-4">Get the latest drops, exclusive offers, and design inspiration delivered to your inbox.</p>
             <form className="flex items-center">
               <input type="email" placeholder="Enter your email" className="bg-brand-bg border border-white/20 rounded-l-lg w-full px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent"/>
               <button type="submit" className="bg-brand-accent hover:bg-brand-accent-hover text-white px-3 py-2 rounded-r-lg"><SendIcon className="w-5 h-5"/></button>
             </form>
-             <ul className="space-y-2 mt-4 text-sm">
+             <ul className="grid grid-cols-2 md:grid-cols-1 lg:grid-cols-1 gap-x-4 gap-y-2 mt-4 text-sm">
               <li className="flex items-center gap-2"><GiftIcon className="w-4 h-4 text-green-400"/>Exclusive discounts</li>
-              <li className="flex items-center gap-2"><BellIcon className="w-4 h-4 text-yellow-400"/>Early access to new drops</li>
               <li className="flex items-center gap-2"><LightbulbIcon className="w-4 h-4 text-blue-400"/>Design tips & inspiration</li>
+              <li className="flex items-center gap-2 col-span-2 md:col-span-1 justify-center md:justify-start"><BellIcon className="w-4 h-4 text-yellow-400"/>Early access to new drops</li>
             </ul>
           </div>
         </div>

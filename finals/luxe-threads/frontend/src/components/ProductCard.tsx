@@ -49,10 +49,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   return (
     <Card 
-      className="cursor-pointer animate-popIn bg-card-light-bg dark:bg-brand-surface border-gray-200/50 dark:border-white/10 border shadow-md dark:shadow-lg hover:shadow-xl transition-shadow !text-card-light-text-primary dark:text-brand-primary max-w-sm" 
+      className="cursor-pointer animate-popIn bg-card-light-bg dark:bg-brand-surface border-gray-200/50 dark:border-white/10 border shadow-md dark:shadow-lg hover:shadow-xl transition-shadow !text-card-light-text-primary dark:text-brand-primary w-full overflow-hidden" 
       onClick={() => navigate(`/product/${product.id}`)}
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-xl">
+      <div className="relative aspect-[4/3] sm:aspect-[3/4] w-full overflow-hidden rounded-t-xl">
         {(product.main_image_url || product.imageUrl) && !imageError ? (
           <img
             src={product.main_image_url || product.imageUrl}
@@ -70,9 +70,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
         {/* Top Left: Discount Pill */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1.5">
+        <div className="absolute top-2 left-2 flex flex-col gap-1.5 max-w-[45%]">
           {discountText && (
-            <div className="text-xs font-semibold text-white bg-badge-pink-bg rounded-full px-2.5 py-1 shadow-md">
+            <div className="text-[10px] sm:text-xs font-semibold text-white bg-badge-pink-bg rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 shadow-md truncate">
               {discountText}
             </div>
           )}
@@ -87,14 +87,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
       </div>
-      <div className="p-3 flex flex-col">
+      <div className="p-2 sm:p-3 flex flex-col min-w-0">
         {categoryName && (
-          <p className="text-xs font-bold uppercase tracking-wider text-purple-600">
+          <p className="text-xs font-bold uppercase tracking-wider text-purple-600 truncate">
             {categoryName}
           </p>
         )}
         {(product.title || product.name) && (
-          <h3 className="text-base font-bold text-card-light-text-primary truncate mt-0.5">
+          <h3 className="text-sm sm:text-base font-bold text-card-light-text-primary truncate mt-0.5">
             {product.title || product.name}
           </h3>
         )}
@@ -104,16 +104,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </p>
         )}
         
-        <div className="flex items-baseline gap-2 mt-1.5">
-          <p className="text-2xl font-extrabold text-pink-500">
+        <div className="mt-1.5">
+          <p className="text-xl sm:text-2xl font-extrabold text-pink-500 truncate">
             {formatCurrency(finalPrice, currency)}
           </p>
           {hasAnyDiscount && (
-            <div className="flex items-baseline gap-1.5">
-              <p className="text-sm text-card-light-text-secondary line-through">
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              <p className="text-xs sm:text-sm text-card-light-text-secondary line-through">
                 {formatCurrency(sellingPrice, currency)}
               </p>
-              <span className="text-xs font-semibold text-pink-500">
+              <span className="text-xs font-semibold text-pink-500 whitespace-nowrap">
                 ({effectiveDiscount.toFixed(0)}% off)
               </span>
             </div>
@@ -121,28 +121,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </div>
         
         {uspTag && (
-          <div className="mt-2 inline-flex items-center gap-1.5 bg-tag-green-bg text-tag-green-text text-xs font-semibold rounded-full px-2.5 py-1 self-start">
-            <RecycleIcon className="w-3 h-3" />
-            <span>{uspTag}</span>
+          <div className="mt-2 inline-flex items-center gap-1.5 bg-tag-green-bg text-tag-green-text text-xs font-semibold rounded-full px-2.5 py-1 self-start max-w-full">
+            <RecycleIcon className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{uspTag}</span>
           </div>
         )}
         
         {/* Color Swatches */}
         {product.variants?.colors && product.variants.colors.length > 0 && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-xs text-card-light-text-secondary">Colors:</span>
-            <div className="flex gap-1.5 flex-wrap">
-              {product.variants.colors.slice(0, 6).map((color, index) => (
+          <div className="mt-2 flex items-start gap-2 overflow-hidden">
+            <span className="text-xs text-card-light-text-secondary flex-shrink-0">Colors:</span>
+            <div className="flex gap-1.5 flex-wrap flex-1 min-w-0">
+              {product.variants.colors.slice(0, 4).map((color, index) => (
                 <span
                   key={index}
-                  className="w-5 h-5 rounded-full border border-gray-300 shadow-sm"
+                  className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border border-gray-300 shadow-sm flex-shrink-0"
                   style={{ backgroundColor: getCssColorValue(color) }}
                   title={color}
                 />
               ))}
-              {product.variants.colors.length > 6 && (
-                <span className="text-xs text-card-light-text-secondary">
-                  +{product.variants.colors.length - 6}
+              {product.variants.colors.length > 4 && (
+                <span className="text-xs text-card-light-text-secondary flex-shrink-0">
+                  +{product.variants.colors.length - 4}
                 </span>
               )}
             </div>

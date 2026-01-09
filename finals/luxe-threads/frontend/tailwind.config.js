@@ -46,12 +46,22 @@ export default {
           '0%, 100%': { transform: 'scale(1)' },
           '30%': { transform: 'scale(0.9)' },
           '50%': { transform: 'scale(1.2)' },
+        },
+        slideInLeft: {
+          '0%': { transform: 'translateX(-100%)', opacity: 0 },
+          '100%': { transform: 'translateX(0)', opacity: 1 }
+        },
+        dropdownIn: {
+          '0%': { transform: 'translateY(-10px) scale(0.95)', opacity: 0 },
+          '100%': { transform: 'translateY(0) scale(1)', opacity: 1 }
         }
       },
       animation: {
         fadeIn: 'fadeIn 0.5s ease-in-out forwards',
         popIn: 'popIn 0.3s ease-out forwards',
         cartBump: 'cartBump 0.4s ease-in-out',
+        slideInLeft: 'slideInLeft 0.3s ease-out forwards',
+        dropdownIn: 'dropdownIn 0.2s ease-out forwards',
       },
       backgroundImage: {
         'footer-dots': 'radial-gradient(circle at center, rgba(169, 162, 194, 0.08) 1px, transparent 1px)',

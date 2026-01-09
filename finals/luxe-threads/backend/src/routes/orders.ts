@@ -9,6 +9,7 @@ import { supabaseAdmin } from "../services/supabase.js";
 import { generateOrderNumber } from "../utils/orderNumber.js";
 import jwt from "jsonwebtoken";
 import { config } from "../config/index.js";
+import { cache } from "../services/redis.js";
 
 const router = Router();
 
@@ -510,6 +511,16 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     console.log(`[ORDER] [${new Date().toISOString()}] ✅ Order items created successfully`);
+
+    // Invalidate best-sellers cache so it refreshes with new order data
+    console.log(`[ORDER] [${new Date().toISOString()}] Invalidating best-sellers cache`);
+    try {
+      await cache.del('orders:last30days');
+      console.log(`[ORDER] [${new Date().toISOString()}] ✅ Cache invalidated successfully`);
+    } catch (cacheError) {
+      console.error(`[ORDER] [${new Date().toISOString()}] ⚠️  Cache invalidation failed:`, cacheError);
+      // Don't fail the order if cache invalidation fails
+    }
 
     const responseData: any = {
       success: true,

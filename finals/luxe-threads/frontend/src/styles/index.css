@@ -10,14 +10,14 @@
 @layer base {
   /* Light theme - default when no .dark class */
   html {
-    --color-bg: #FFFFFF;
-    --color-surface: #F9FAFB;
+    --color-bg: #FAF8FF; /* Subtle lavender tinge */
+    --color-surface: #F5F3FF; /* Lighter purple tint */
     --color-primary: #111827;
     --color-secondary: #4B5563;
     --color-accent: #9333EA;
     --color-accent-hover: #7C3AED;
-    --color-card-bg: #FFFFFF;
-    --color-card-border: #D1D5DB;
+    --color-card-bg: #FFFFFF; /* Keep cards pure white for contrast */
+    --color-card-border: #E9D5FF; /* Light purple border */
     --color-hero-text: #FFFFFF;
   }
   
@@ -32,6 +32,12 @@
     --color-card-bg: #191333;
     --color-card-border: rgba(255, 255, 255, 0.1);
     --color-hero-text: #FFFFFF;
+  }
+
+  /* Subtle gradient background for light theme */
+  html:not(.dark) body {
+    background: linear-gradient(135deg, #FAF8FF 0%, #FEF9FF 50%, #F9F8FF 100%);
+    background-attachment: fixed;
   }
 }
 

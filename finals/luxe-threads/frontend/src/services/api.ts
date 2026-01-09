@@ -362,22 +362,32 @@ const api = {
     }
   },
 
-  getBestSellers: async (): Promise<Product[]> => {
-    await new Promise(res => setTimeout(res, 300));
-    // Filter products with 'Best Seller' tag or high review count
-    return products.filter(p => 
-      p.tags?.includes('Best Seller') || 
-      (p.reviewCount && p.reviewCount > 100)
-    );
+  getBestSellers: async (limit?: number): Promise<Product[]> => {
+    try {
+      const queryParams = limit ? `?limit=${limit}` : '';
+      return await apiCall(`/products/best-sellers${queryParams}`);
+    } catch (error) {
+      console.error('Error fetching best sellers:', error);
+      // Fallback to mock data if API fails
+      return products.filter(p => 
+        p.tags?.includes('Best Seller') || 
+        (p.reviewCount && p.reviewCount > 100)
+      ).slice(0, limit || 8);
+    }
   },
 
-  getNewArrivals: async (): Promise<Product[]> => {
-    await new Promise(res => setTimeout(res, 300));
-    // Filter products with 'New Arrival' tag or recently added (last 3 products)
-    return products.filter(p => 
-      p.tags?.includes('New Arrival') || 
-      ['4', '9', '10'].includes(p.id)
-    );
+  getNewArrivals: async (limit?: number): Promise<Product[]> => {
+    try {
+      const queryParams = limit ? `?limit=${limit}` : '';
+      return await apiCall(`/products/new-arrivals${queryParams}`);
+    } catch (error) {
+      console.error('Error fetching new arrivals:', error);
+      // Fallback to mock data if API fails
+      return products.filter(p => 
+        p.tags?.includes('New Arrival') || 
+        ['4', '9', '10'].includes(p.id)
+      ).slice(0, limit || 8);
+    }
   },
 
       getSaleItems: async (): Promise<Product[]> => {
