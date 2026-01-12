@@ -11,8 +11,8 @@ interface ColorMapping {
 // Common color mappings
 const COLOR_MAP: ColorMapping[] = [
   { name: 'Black', hex: '#000000', aliases: ['#000', '#1a1a1a', '#0f172a'] },
-  { name: 'White', hex: '#FFFFFF', aliases: ['#fff', '#f8f9fa', '#ffffff'] },
-  { name: 'Gray', hex: '#808080', aliases: ['#6b7280', '#9ca3af', '#d1d5db', '#374151'] },
+  { name: 'White', hex: '#FFFFFF', aliases: ['#fff', '#f8f9fa', '#ffffff', '#fafafa', '#f5f5f5'] },
+  { name: 'Gray', hex: '#808080', aliases: ['#6b7280', '#9ca3af', '#d1d5db', '#374151', '#e5e7eb', '#e3e3e3', '#d4d4d4', '#a3a3a3', '#737373', '#525252'] },
   { name: 'Navy', hex: '#001f3f', aliases: ['#1e3a8a', '#1e40af', '#3b82f6'] },
   { name: 'Blue', hex: '#0074D9', aliases: ['#2563eb', '#3b82f6', '#60a5fa'] },
   { name: 'Teal', hex: '#39CCCC', aliases: ['#14b8a6', '#2dd4bf', '#5eead4', '#0d9488'] },

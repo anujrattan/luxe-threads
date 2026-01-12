@@ -5,7 +5,7 @@ import { Card } from './ui';
 import { RecycleIcon, SaleTagIcon } from './icons';
 import { formatCurrency } from '../utils/currency';
 import { useApp } from '../context/AppContext';
-import { getCssColorValue } from '../utils/colorUtils';
+import { getCssColorValue, getColorName } from '../utils/colorUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -137,7 +137,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                   key={index}
                   className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border border-gray-300 shadow-sm flex-shrink-0"
                   style={{ backgroundColor: getCssColorValue(color) }}
-                  title={color}
+                  title={getColorName(color)}
                 />
               ))}
               {product.variants.colors.length > 4 && (

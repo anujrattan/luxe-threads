@@ -6,7 +6,7 @@ import { UploadCloudIcon, LinkIcon, XIcon, PlusIcon } from '../../../components/
 import { ProductCardPreview } from '../../../components/ProductCardPreview';
 import { formatCurrency, getCurrencySymbol } from '../../../utils/currency';
 import { useApp } from '../../../context/AppContext';
-import { formatColorInput, getCssColorValue } from '../../../utils/colorUtils';
+import { formatColorInput, getCssColorValue, getColorName } from '../../../utils/colorUtils';
 
 export const ProductForm: React.FC<{ product?: Product | null, onSave: () => void, onCancel: () => void, categories: Category[] }> = ({ product, onSave, onCancel, categories }) => {
   const { currency } = useApp();
@@ -765,9 +765,9 @@ export const ProductForm: React.FC<{ product?: Product | null, onSave: () => voi
                       <span
                         className="w-4 h-4 rounded-full border border-white/30"
                         style={{ backgroundColor: getCssColorValue(color) }}
-                        title={color}
+                        title={getColorName(color)}
                       />
-                      <span>{color}</span>
+                      <span>{getColorName(color)}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -1149,7 +1149,7 @@ export const ProductForm: React.FC<{ product?: Product | null, onSave: () => voi
                   <option value="">-- Select a color --</option>
                   {formData.colors.map((color) => (
                     <option key={color} value={color}>
-                      {color}
+                      {getColorName(color)}
                     </option>
                   ))}
                 </select>

@@ -10,6 +10,7 @@ import { HomePage } from "./pages/HomePage";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { ProductDetailPage } from "./pages/ProductDetailPage";
+import { SearchPage } from "./pages/SearchPage";
 import { CartPage } from "./pages/CartPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { PaymentCallbackPage } from "./pages/PaymentCallbackPage";
@@ -191,6 +192,7 @@ const AppLayout: React.FC = () => {
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/category/:slug" element={<ProductListPage />} />
           <Route path="/product/:id" element={<ProductDetailPage />} />

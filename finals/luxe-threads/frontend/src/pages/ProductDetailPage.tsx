@@ -6,7 +6,7 @@ import { Button } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils/currency';
-import { getCssColorValue } from '../utils/colorUtils';
+import { getCssColorValue, getColorName } from '../utils/colorUtils';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -211,7 +211,7 @@ export const ProductDetailPage: React.FC = () => {
             {availableColors.length > 0 && availableColors[0] !== 'N/A' && (
               <div>
                 <h3 className="text-sm font-medium text-brand-primary">
-                  Color: <span className="font-bold">{selectedColor}</span>
+                  Color: <span className="font-bold">{getColorName(selectedColor)}</span>
                 </h3>
                 <div className="flex items-center space-x-3 mt-2">
                   {availableColors.map(color => {
@@ -239,7 +239,7 @@ export const ProductDetailPage: React.FC = () => {
                         <span 
                           className={`h-8 w-8 rounded-full border border-white/20`} 
                           style={{ backgroundColor: getCssColorValue(color) }}
-                          title={color}
+                          title={getColorName(color)}
                         ></span>
                       </button>
                     );
@@ -257,10 +257,10 @@ export const ProductDetailPage: React.FC = () => {
                     <button 
                       key={size}
                       onClick={() => setSelectedSize(size)}
-                      className={`group relative flex items-center justify-center rounded-lg border py-3 px-4 text-sm font-medium uppercase transition-all duration-200 ease-in-out focus:outline-none sm:flex-1 ${
+                      className={`group relative flex items-center justify-center rounded-lg border-2 py-3 px-4 text-sm font-medium uppercase transition-all duration-200 ease-in-out focus:outline-none sm:flex-1 ${
                         selectedSize === size 
-                          ? 'bg-brand-accent text-white shadow-md border-brand-accent' 
-                          : 'bg-brand-surface text-brand-primary hover:bg-white/10 border-white/20'
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg border-transparent scale-105' 
+                          : 'bg-white dark:bg-brand-surface text-brand-primary hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 hover:shadow-md border-gray-300 dark:border-white/30 shadow-sm'
                       }`}
                     >
                       {size}

@@ -504,7 +504,27 @@ const api = {
           }),
         });
       },
-    };
 
-    export default api;
+  // Search products
+  searchProducts: async (params: {
+    q: string;
+    category?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ results: Product[]; total: number; query: string; page: number; limit: number }> => {
+    const queryString = new URLSearchParams(
+      Object.entries(params).reduce((acc, [key, value]) => {
+        if (value !== undefined && value !== null) {
+          acc[key] = String(value);
+        }
+        return acc;
+      }, {} as Record<string, string>)
+    ).toString();
+    return await apiCall(`/products/search?${queryString}`);
+  },
+};
+
+export default api;
 

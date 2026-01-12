@@ -51,7 +51,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, ...props }, ref) => (
     <input
       ref={ref}
-      className={`flex h-10 w-full rounded-lg border border-white/20 bg-brand-surface px-3 py-2 text-sm text-brand-primary transition-colors placeholder:text-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className || ''}`}
+      className={`flex h-10 w-full rounded-lg border-2 border-gray-300 dark:border-white/30 bg-white dark:bg-brand-surface px-3 py-2 text-sm text-brand-primary shadow-sm transition-all placeholder:text-brand-secondary hover:border-gray-400 dark:hover:border-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-brand-accent dark:focus:border-brand-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-brand-surface/50 ${className || ''}`}
       {...props}
     />
   )

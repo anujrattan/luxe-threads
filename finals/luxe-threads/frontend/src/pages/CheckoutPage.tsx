@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Input } from '../components/ui';
+import { Button, Input, Select } from '../components/ui';
 import api from '../services/api';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils/currency';
+import { validateForm, validationSchemas, clearFieldError, ValidationErrors } from '../utils/formValidation';
+import { countryCodes, getDefaultCountry, formatPhoneForBackend, parsePhoneFromBackend } from '../utils/countryCodes';
 
 
 const CheckoutForm: React.FC<{ 
@@ -11,27 +13,57 @@ const CheckoutForm: React.FC<{
   paymentMethod: 'COD' | 'Prepaid';
   onPaymentMethodChange: (method: 'COD' | 'Prepaid') => void;
   initialData?: any;
-}> = ({ onSubmit, paymentMethod, onPaymentMethodChange, initialData }) => {
+  onAddressSaved?: (addressData: any) => void;
+  isGuest?: boolean;
+}> = ({ onSubmit, paymentMethod, onPaymentMethodChange, initialData, onAddressSaved, isGuest }) => {
+  // For guest users, try to load from localStorage first
+  const getInitialData = () => {
+    if (isGuest && !initialData) {
+      try {
+        const savedAddress = localStorage.getItem('guestCheckoutAddress');
+        if (savedAddress) {
+          const parsed = JSON.parse(savedAddress);
+          console.log('Loaded guest address from localStorage');
+          return parsed;
+        }
+      } catch (error) {
+        console.error('Failed to load address from localStorage:', error);
+      }
+    }
+    return initialData;
+  };
+
+  const effectiveInitialData = getInitialData();
+  
+  // Parse phone number if it exists in initialData
+  const parsedPhone = effectiveInitialData?.phone ? parsePhoneFromBackend(effectiveInitialData.phone) : { dialCode: getDefaultCountry().dialCode, phoneNumber: '' };
+  
   const [formData, setFormData] = useState({
-    firstName: initialData?.first_name || '',
-    lastName: initialData?.last_name || '',
-    email: initialData?.email || '',
-    phone: initialData?.phone || '',
-    address: initialData?.address1 || '',
-    address2: initialData?.address2 || '',
-    city: initialData?.city || '',
-    state: initialData?.province || '',
-    zip: initialData?.zip || '',
+    firstName: effectiveInitialData?.firstName || effectiveInitialData?.first_name || '',
+    lastName: effectiveInitialData?.lastName || effectiveInitialData?.last_name || '',
+    email: effectiveInitialData?.email || '',
+    countryCode: parsedPhone.dialCode || effectiveInitialData?.countryCode || getDefaultCountry().dialCode,
+    phone: parsedPhone.phoneNumber || effectiveInitialData?.phone?.replace(/^\+\d{1,4}/, '') || '',
+    address: effectiveInitialData?.address || effectiveInitialData?.address1 || '',
+    address2: effectiveInitialData?.address2 || '',
+    city: effectiveInitialData?.city || '',
+    state: effectiveInitialData?.state || effectiveInitialData?.province || '',
+    zip: effectiveInitialData?.zip || '',
   });
-  const [errors, setErrors] = useState<Partial<typeof formData>>({});
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [isAddressSaved, setIsAddressSaved] = useState(false);
+  const [isEditing, setIsEditing] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (initialData) {
+      const parsedPhone = initialData.phone ? parsePhoneFromBackend(initialData.phone) : { dialCode: getDefaultCountry().dialCode, phoneNumber: '' };
       setFormData({
         firstName: initialData.first_name || '',
         lastName: initialData.last_name || '',
         email: initialData.email || '',
-        phone: initialData.phone || '',
+        countryCode: parsedPhone.dialCode,
+        phone: parsedPhone.phoneNumber,
         address: initialData.address1 || '',
         address2: initialData.address2 || '',
         city: initialData.city || '',
@@ -42,54 +74,191 @@ const CheckoutForm: React.FC<{
   }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name as keyof typeof errors]) {
-      setErrors({ ...errors, [e.target.name]: undefined });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(clearFieldError(errors, name));
+    }
+  };
+
+  const handleCountryCodeChange = (value: string) => {
+    setFormData({ ...formData, countryCode: value });
+    if (errors.countryCode) {
+      setErrors(clearFieldError(errors, 'countryCode'));
+    }
+  };
+
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form using validation utility
+    const validationErrors = validateForm(formData, validationSchemas.checkout);
+    
+    if (Object.keys(validationErrors).length === 0) {
+      setIsSaving(true);
+      try {
+        // Format phone number for backend
+        const formattedPhone = formatPhoneForBackend(formData.phone, formData.countryCode);
+        
+        const addressData = {
+          ...formData,
+          phone: formattedPhone,
+        };
+        
+        // Notify parent component that address is saved
+        if (onAddressSaved) {
+          await onAddressSaved(addressData);
+        }
+        
+        // Mark address as saved and make fields read-only
+        setIsAddressSaved(true);
+        setIsEditing(false);
+      } catch (error) {
+        console.error('Error saving address:', error);
+        alert('Failed to save address. Please try again.');
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      // Set all errors at once
+      setErrors(validationErrors);
+      
+      // Scroll to first error
+      const firstErrorField = Object.keys(validationErrors)[0];
+      const element = document.getElementById(firstErrorField);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.focus();
+      }
     }
   };
   
-  const validate = () => {
-    const newErrors: Partial<typeof formData> = {};
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.zip.trim()) newErrors.zip = 'ZIP code is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleEdit = () => {
+    setIsEditing(true);
   };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  
+  const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      onSubmit(formData, paymentMethod);
+    
+    if (!isAddressSaved) {
+      // If address not saved yet, save it first
+      handleSaveAddress(e);
+      return;
     }
+    
+    // Format phone number for backend
+    const formattedPhone = formatPhoneForBackend(formData.phone, formData.countryCode);
+    
+    // Submit order
+    onSubmit({
+      ...formData,
+      phone: formattedPhone,
+    }, paymentMethod);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={isAddressSaved ? handlePlaceOrder : handleSaveAddress} className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium text-brand-primary">Contact Information</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-brand-primary">Contact Information</h2>
+          {isAddressSaved && !isEditing && (
+            <Button
+              type="button"
+              onClick={handleEdit}
+              variant="outline"
+              className="text-sm py-1 px-3"
+            >
+              Edit Address
+            </Button>
+          )}
+        </div>
         <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
           <div>
-            <label htmlFor="firstName" className="block text-sm font-medium text-brand-secondary">First Name</label>
-            <Input type="text" name="firstName" id="firstName" value={formData.firstName} onChange={handleChange} className="mt-1" required/>
-            {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+            <label htmlFor="firstName" className="block text-sm font-medium text-brand-secondary">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="text" 
+              name="firstName" 
+              id="firstName" 
+              value={formData.firstName} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.firstName ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.firstName}
+              aria-describedby={errors.firstName ? 'firstName-error' : undefined}
+            />
+            {errors.firstName && <p id="firstName-error" className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
           </div>
           <div>
-            <label htmlFor="lastName" className="block text-sm font-medium text-brand-secondary">Last Name</label>
-            <Input type="text" name="lastName" id="lastName" value={formData.lastName} onChange={handleChange} className="mt-1" required/>
-            {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+            <label htmlFor="lastName" className="block text-sm font-medium text-brand-secondary">
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="text" 
+              name="lastName" 
+              id="lastName" 
+              value={formData.lastName} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.lastName ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.lastName}
+              aria-describedby={errors.lastName ? 'lastName-error' : undefined}
+            />
+            {errors.lastName && <p id="lastName-error" className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-brand-secondary">Email</label>
-            <Input type="email" name="email" id="email" value={formData.email} onChange={handleChange} className="mt-1" required/>
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+            <label htmlFor="email" className="block text-sm font-medium text-brand-secondary">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="email" 
+              name="email" 
+              id="email" 
+              value={formData.email} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.email ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'email-error' : undefined}
+            />
+            {errors.email && <p id="email-error" className="text-red-500 text-sm mt-1">{errors.email}</p>}
           </div>
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-brand-secondary">Phone (Optional)</label>
-            <Input type="tel" name="phone" id="phone" value={formData.phone} onChange={handleChange} className="mt-1"/>
+            <label htmlFor="phone" className="block text-sm font-medium text-brand-secondary mb-1">
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <div className="w-32">
+                <Select
+                  options={countryCodes.map(country => ({
+                    value: country.dialCode,
+                    label: `${country.flag} ${country.dialCode}`
+                  }))}
+                  value={formData.countryCode}
+                  onChange={handleCountryCodeChange}
+                  disabled={!isEditing}
+                  className={errors.countryCode ? 'border-red-500' : ''}
+                />
+              </div>
+              <div className="flex-1">
+                <Input 
+                  type="tel" 
+                  name="phone" 
+                  id="phone" 
+                  value={formData.phone} 
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="Enter phone number"
+                  className={errors.phone ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}
+                  aria-invalid={!!errors.phone}
+                  aria-describedby={errors.phone ? 'phone-error' : undefined}
+                />
+              </div>
+            </div>
+            {errors.countryCode && <p className="text-red-500 text-sm mt-1">{errors.countryCode}</p>}
+            {errors.phone && <p id="phone-error" className="text-red-500 text-sm mt-1">{errors.phone}</p>}
           </div>
         </div>
       </div>
@@ -97,53 +266,113 @@ const CheckoutForm: React.FC<{
         <h2 className="text-lg font-medium text-brand-primary">Shipping Address</h2>
         <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
           <div className="sm:col-span-2">
-            <label htmlFor="address" className="block text-sm font-medium text-brand-secondary">Address Line 1</label>
-            <Input type="text" name="address" id="address" value={formData.address} onChange={handleChange} className="mt-1"/>
-            {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+            <label htmlFor="address" className="block text-sm font-medium text-brand-secondary">
+              Address Line 1 <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="text" 
+              name="address" 
+              id="address" 
+              value={formData.address} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.address ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.address}
+              aria-describedby={errors.address ? 'address-error' : undefined}
+            />
+            {errors.address && <p id="address-error" className="text-red-500 text-sm mt-1">{errors.address}</p>}
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="address2" className="block text-sm font-medium text-brand-secondary">Address Line 2 (Optional)</label>
-            <Input type="text" name="address2" id="address2" value={formData.address2} onChange={handleChange} className="mt-1"/>
+            <label htmlFor="address2" className="block text-sm font-medium text-brand-secondary">
+              Address Line 2 <span className="text-gray-500 text-xs">(Optional)</span>
+            </label>
+            <Input 
+              type="text" 
+              name="address2" 
+              id="address2" 
+              value={formData.address2} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className="mt-1"
+            />
           </div>
           <div>
-            <label htmlFor="city" className="block text-sm font-medium text-brand-secondary">City</label>
-            <Input type="text" name="city" id="city" value={formData.city} onChange={handleChange} className="mt-1"/>
-            {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+            <label htmlFor="city" className="block text-sm font-medium text-brand-secondary">
+              City <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="text" 
+              name="city" 
+              id="city" 
+              value={formData.city} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.city ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.city}
+              aria-describedby={errors.city ? 'city-error' : undefined}
+            />
+            {errors.city && <p id="city-error" className="text-red-500 text-sm mt-1">{errors.city}</p>}
           </div>
           <div>
-            <label htmlFor="state" className="block text-sm font-medium text-brand-secondary">State / Province</label>
-            <Input type="text" name="state" id="state" value={formData.state} onChange={handleChange} className="mt-1"/>
+            <label htmlFor="state" className="block text-sm font-medium text-brand-secondary">
+              State / Province <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="text" 
+              name="state" 
+              id="state" 
+              value={formData.state} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.state ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.state}
+              aria-describedby={errors.state ? 'state-error' : undefined}
+            />
+            {errors.state && <p id="state-error" className="text-red-500 text-sm mt-1">{errors.state}</p>}
           </div>
           <div>
-            <label htmlFor="zip" className="block text-sm font-medium text-brand-secondary">ZIP / Postal Code</label>
-            <Input type="text" name="zip" id="zip" value={formData.zip} onChange={handleChange} className="mt-1"/>
-            {errors.zip && <p className="text-red-500 text-sm mt-1">{errors.zip}</p>}
+            <label htmlFor="zip" className="block text-sm font-medium text-brand-secondary">
+              ZIP / Postal Code <span className="text-red-500">*</span>
+            </label>
+            <Input 
+              type="text" 
+              name="zip" 
+              id="zip" 
+              value={formData.zip} 
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`mt-1 ${errors.zip ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}
+              aria-invalid={!!errors.zip}
+              aria-describedby={errors.zip ? 'zip-error' : undefined}
+            />
+            {errors.zip && <p id="zip-error" className="text-red-500 text-sm mt-1">{errors.zip}</p>}
           </div>
         </div>
       </div>
       
-      {/* Payment Method Selection */}
-      <div>
-        <h2 className="text-lg font-medium text-brand-primary mb-4">Payment Method</h2>
-        <div className="grid grid-cols-2 gap-4">
+      {/* Payment Method Selection - Only show after address is saved AND not currently editing */}
+      {isAddressSaved && !isEditing && (
+        <div className="hidden lg:block">
+          <h2 className="text-lg font-medium text-brand-primary mb-4">Payment Method</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             type="button"
             onClick={() => onPaymentMethodChange('COD')}
             className={`p-4 rounded-lg border-2 transition-all ${
               paymentMethod === 'COD'
                 ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20'
-                : 'border-white/20 bg-brand-surface hover:border-purple-500/50'
+                : 'border-gray-300 dark:border-white/20 bg-brand-surface hover:border-purple-500/50'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-brand-primary">Cash on Delivery</h3>
-                <p className="text-sm text-brand-secondary mt-1">Pay when you receive</p>
-              </div>
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                paymentMethod === 'COD' ? 'border-purple-500 bg-purple-500' : 'border-white/30'
+            <div className="flex items-center gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                paymentMethod === 'COD' ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-white/30'
               }`}>
                 {paymentMethod === 'COD' && <div className="w-2 h-2 rounded-full bg-white" />}
+              </div>
+              <div className="text-left">
+                <h3 className="text-base font-semibold text-brand-primary">Cash on Delivery</h3>
+                <p className="text-sm text-brand-secondary mt-1">Pay when you receive</p>
               </div>
             </div>
           </button>
@@ -154,27 +383,40 @@ const CheckoutForm: React.FC<{
             className={`p-4 rounded-lg border-2 transition-all ${
               paymentMethod === 'Prepaid'
                 ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20'
-                : 'border-white/20 bg-brand-surface hover:border-purple-500/50'
+                : 'border-gray-300 dark:border-white/20 bg-brand-surface hover:border-purple-500/50'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-brand-primary">Pay Online</h3>
-                <p className="text-sm text-brand-secondary mt-1">UPI, Cards & more</p>
-              </div>
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                paymentMethod === 'Prepaid' ? 'border-purple-500 bg-purple-500' : 'border-white/30'
+            <div className="flex items-center gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                paymentMethod === 'Prepaid' ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-white/30'
               }`}>
                 {paymentMethod === 'Prepaid' && <div className="w-2 h-2 rounded-full bg-white" />}
+              </div>
+              <div className="text-left">
+                <h3 className="text-base font-semibold text-brand-primary">Pay Online</h3>
+                <p className="text-sm text-brand-secondary mt-1">UPI, Cards & more</p>
               </div>
             </div>
           </button>
         </div>
+        
+        {/* Place Order Button - Shows after address is saved and payment method selected */}
+        <Button 
+          type="button"
+          onClick={handlePlaceOrder}
+          className="w-full py-3 mt-6"
+        >
+          {paymentMethod === 'COD' ? 'Place Order' : 'Proceed to Payment'}
+        </Button>
       </div>
+      )}
       
-      <Button type="submit" className="w-full py-3">
-        {paymentMethod === 'COD' ? 'Place Order' : 'Proceed to Payment'}
-      </Button>
+      {/* Save Address Button - Shows when editing (new address or re-editing saved address) */}
+      {(!isAddressSaved || (isAddressSaved && isEditing)) && (
+        <Button type="submit" className="w-full py-3" disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Save Address'}
+        </Button>
+      )}
     </form>
   );
 };
@@ -233,6 +475,22 @@ export const CheckoutPage: React.FC = () => {
   }, [location]);
 
   const selectedAddress = savedAddresses.find(addr => addr.id === selectedAddressId);
+
+  const handleAddressSaved = async (addressData: any) => {
+    // This callback is triggered when user clicks "Save Address"
+    
+    if (!isAuthenticated) {
+      // For guest users: Save to localStorage for auto-fill on next visit
+      try {
+        localStorage.setItem('guestCheckoutAddress', JSON.stringify(addressData));
+        console.log('Guest address saved to localStorage');
+      } catch (error) {
+        console.error('Failed to save address to localStorage:', error);
+      }
+    }
+    // For logged-in users: Address will be saved to DB when order is placed
+    // (already handled by saved addresses feature)
+  };
 
   const handlePlaceOrder = async (formData: any, gateway: 'COD' | 'Prepaid') => {
     setIsSubmitting(true);
@@ -445,6 +703,8 @@ export const CheckoutPage: React.FC = () => {
                     onSubmit={handlePlaceOrder}
                     paymentMethod={paymentMethod}
                     onPaymentMethodChange={setPaymentMethod}
+                    onAddressSaved={handleAddressSaved}
+                    isGuest={!isAuthenticated}
                     initialData={selectedAddress && !useNewAddress ? selectedAddress : user ? {
                       email: user.email,
                       first_name: user.name?.split(' ')[0] || '',
@@ -455,28 +715,28 @@ export const CheckoutPage: React.FC = () => {
 
                 {/* Show payment method and submit button if address is selected */}
                 {isAuthenticated && savedAddresses.length > 0 && !useNewAddress && selectedAddressId && (
-                  <div className="mt-6">
+                  <div className="mt-6 hidden lg:block">
                     <div className="mb-6">
                       <h2 className="text-lg font-medium text-brand-primary mb-4">Payment Method</h2>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <button
                           type="button"
                           onClick={() => setPaymentMethod('COD')}
                           className={`p-4 rounded-lg border-2 transition-all ${
                             paymentMethod === 'COD'
                               ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20'
-                              : 'border-white/20 bg-brand-surface hover:border-purple-500/50'
+                              : 'border-gray-300 dark:border-white/20 bg-brand-surface hover:border-purple-500/50'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-base font-semibold text-brand-primary">Cash on Delivery</h3>
-                              <p className="text-sm text-brand-secondary mt-1">Pay when you receive</p>
-                            </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              paymentMethod === 'COD' ? 'border-purple-500 bg-purple-500' : 'border-white/30'
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              paymentMethod === 'COD' ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-white/30'
                             }`}>
                               {paymentMethod === 'COD' && <div className="w-2 h-2 rounded-full bg-white" />}
+                            </div>
+                            <div className="text-left">
+                              <h3 className="text-base font-semibold text-brand-primary">Cash on Delivery</h3>
+                              <p className="text-sm text-brand-secondary mt-1">Pay when you receive</p>
                             </div>
                           </div>
                         </button>
@@ -487,18 +747,18 @@ export const CheckoutPage: React.FC = () => {
                           className={`p-4 rounded-lg border-2 transition-all ${
                             paymentMethod === 'Prepaid'
                               ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20'
-                              : 'border-white/20 bg-brand-surface hover:border-purple-500/50'
+                              : 'border-gray-300 dark:border-white/20 bg-brand-surface hover:border-purple-500/50'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-base font-semibold text-brand-primary">Pay Online</h3>
-                              <p className="text-sm text-brand-secondary mt-1">UPI, Cards & more</p>
-                            </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                              paymentMethod === 'Prepaid' ? 'border-purple-500 bg-purple-500' : 'border-white/30'
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              paymentMethod === 'Prepaid' ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-white/30'
                             }`}>
                               {paymentMethod === 'Prepaid' && <div className="w-2 h-2 rounded-full bg-white" />}
+                            </div>
+                            <div className="text-left">
+                              <h3 className="text-base font-semibold text-brand-primary">Pay Online</h3>
+                              <p className="text-sm text-brand-secondary mt-1">UPI, Cards & more</p>
                             </div>
                           </div>
                         </button>
@@ -515,7 +775,9 @@ export const CheckoutPage: React.FC = () => {
               </>
             )}
           </main>
-          <aside className="lg:col-span-1 mt-10 lg:mt-0">
+          
+          {/* Order Summary - Desktop (right sidebar) */}
+          <aside className="hidden lg:block lg:col-span-1 mt-10 lg:mt-0">
             <div className="bg-brand-surface p-6 rounded-lg shadow-sm border border-white/10">
               <h2 className="text-lg font-medium text-brand-primary">Order Summary</h2>
               <ul className="mt-6 divide-y divide-white/10">
@@ -551,6 +813,117 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
           </aside>
+          
+          {/* Order Summary & Payment - Mobile (below form) */}
+          <div className="lg:hidden mt-8">
+            {/* Order Summary */}
+            <div className="bg-brand-surface p-6 rounded-lg shadow-sm border border-white/10 mb-6">
+              <h2 className="text-lg font-medium text-brand-primary">Order Summary</h2>
+              <ul className="mt-6 divide-y divide-white/10">
+                {cart.map(item => (
+                  <li key={item.id} className="flex py-4 space-x-4">
+                    <img src={item.imageUrl || item.main_image_url} alt={item.name || item.title} className="w-16 h-16 rounded-md object-cover"/>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-brand-primary">{item.name || item.title}</h3>
+                      <p className="text-sm text-brand-secondary">Qty: {item.quantity}</p>
+                    </div>
+                    <p className="text-sm font-medium text-brand-primary">{formatCurrency(item.price * item.quantity, currency)}</p>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 pt-6 border-t border-white/10 space-y-2">
+                <div className="flex justify-between text-sm text-brand-secondary">
+                  <span>Subtotal</span>
+                  <span className="text-brand-primary">{formatCurrency(subtotal, currency)}</span>
+                </div>
+                {shippingCost > 0 && (
+                  <div className="flex justify-between text-sm text-brand-secondary">
+                    <span>Shipping</span>
+                    <span className="text-brand-primary">{formatCurrency(shippingCost, currency)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-medium text-brand-primary pt-2 border-t border-white/10">
+                  <span>Total</span>
+                  <span>{formatCurrency(total, currency)}</span>
+                </div>
+                <p className="text-xs text-brand-secondary">
+                  Prices are inclusive of all applicable GST.
+                </p>
+              </div>
+            </div>
+            
+            {/* Payment Method - Mobile */}
+            {!isSubmitting && (
+              <div className="bg-brand-surface p-6 rounded-lg shadow-sm border border-white/10">
+                <h2 className="text-lg font-medium text-brand-primary mb-4">Payment Method</h2>
+                <div className="grid grid-cols-1 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('COD')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      paymentMethod === 'COD'
+                        ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20'
+                        : 'border-gray-300 dark:border-white/20 bg-brand-surface hover:border-purple-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        paymentMethod === 'COD' ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-white/30'
+                      }`}>
+                        {paymentMethod === 'COD' && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-base font-semibold text-brand-primary">Cash on Delivery</h3>
+                        <p className="text-sm text-brand-secondary mt-1">Pay when you receive</p>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('Prepaid')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      paymentMethod === 'Prepaid'
+                        ? 'border-purple-500 bg-purple-500/10 ring-2 ring-purple-500/20'
+                        : 'border-gray-300 dark:border-white/20 bg-brand-surface hover:border-purple-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        paymentMethod === 'Prepaid' ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-white/30'
+                      }`}>
+                        {paymentMethod === 'Prepaid' && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-base font-semibold text-brand-primary">Pay Online</h3>
+                        <p className="text-sm text-brand-secondary mt-1">UPI, Cards & more</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+                
+                {/* Place Order Button - Mobile */}
+                {((useNewAddress || !isAuthenticated || savedAddresses.length === 0) || (isAuthenticated && savedAddresses.length > 0 && !useNewAddress && selectedAddressId)) && (
+                  <Button
+                    onClick={() => {
+                      if (useNewAddress || !isAuthenticated || savedAddresses.length === 0) {
+                        // Trigger form submission via form element
+                        const form = document.querySelector('form');
+                        if (form) {
+                          form.requestSubmit();
+                        }
+                      } else {
+                        handlePlaceOrder({}, paymentMethod);
+                      }
+                    }}
+                    className="w-full py-3 mt-6"
+                  >
+                    {paymentMethod === 'COD' ? 'Place Order' : 'Proceed to Payment'}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

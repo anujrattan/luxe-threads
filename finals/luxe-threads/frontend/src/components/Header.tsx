@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBagIcon, UserIcon, ChevronDownIcon, LogOutIcon, SettingsIcon, SunIcon, MoonIcon, XIcon } from './icons';
+import { ShoppingBagIcon, UserIcon, ChevronDownIcon, LogOutIcon, SettingsIcon, SunIcon, MoonIcon, XIcon, SearchIcon, ClockIcon } from './icons';
 import { Category } from '../types';
 import api from '../services/api';
 import { useApp } from '../context/AppContext';
+import { useSearch } from '../hooks/useSearch';
+import { formatCurrency } from '../utils/currency';
 
 interface HeaderProps {
   cartItemCount: number;
@@ -21,12 +23,27 @@ const HamburgerIcon: React.FC<{ className?: string }> = ({ className }) => (
 export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cartAnimationKey }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isAdmin, logout, theme, toggleTheme } = useApp();
+  const { user, isAuthenticated, isAdmin, logout, theme, toggleTheme, currency } = useApp();
   const [categories, setCategories] = useState<Category[]>([]);
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   const isHomePage = location.pathname === '/';
+  
+  // Use search hook for suggestions and recent searches
+  const { 
+    suggestions, 
+    loading: suggestionsLoading, 
+    recentSearches, 
+    saveSearch, 
+    removeRecentSearch,
+    fetchSuggestions 
+  } = useSearch();
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -36,16 +53,33 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
     fetchCategories();
   }, []);
 
-  // Close user menu when clicking outside
+  // Fetch suggestions when search query changes
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      fetchSuggestions(searchQuery);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  }, [searchQuery, fetchSuggestions]);
+
+  // Close user menu and suggestions dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuOpen && !(event.target as Element).closest('.relative')) {
         setUserMenuOpen(false);
       }
+      if (showSuggestions && 
+          searchInputRef.current && 
+          !searchInputRef.current.contains(event.target as Node) &&
+          suggestionsRef.current &&
+          !suggestionsRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userMenuOpen]);
+  }, [userMenuOpen, showSuggestions]);
 
   const navItems = [
     { name: 'Home', path: '/' },
@@ -60,10 +94,53 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
     return location.pathname.startsWith(path);
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      saveSearch(searchQuery.trim());
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSearchBar(false);
+      setShowSuggestions(false);
+      setSearchQuery('');
+    }
+  };
+
+  const handleSuggestionClick = (productId: string) => {
+    navigate(`/product/${productId}`);
+    setShowSearchBar(false);
+    setShowSuggestions(false);
+    setSearchQuery('');
+  };
+
+  const handleRecentSearchClick = (query: string) => {
+    setSearchQuery(query);
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setShowSearchBar(false);
+    setShowSuggestions(false);
+    setSearchQuery('');
+  };
+
+  const closeSearchBar = () => {
+    setShowSearchBar(false);
+    setShowSuggestions(false);
+    setSearchQuery('');
+  };
+
+  // Handle Escape key to close search bar
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showSearchBar) {
+        closeSearchBar();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showSearchBar]);
+
   return (
     <>
-      <header className={`${isHomePage ? 'absolute' : 'sticky'} top-0 left-0 right-0 z-50 w-full px-4 sm:px-6 pt-2 ${isHomePage ? 'bg-gradient-to-b from-black/50 to-transparent backdrop-blur-sm' : 'bg-transparent'}`}>
-        <div className="mx-auto max-w-screen-xl flex items-center justify-between">
+      <header className={`${isHomePage ? 'absolute' : 'sticky'} top-0 left-0 right-0 z-50 w-full max-w-full px-4 sm:px-6 pt-2 overflow-x-hidden ${isHomePage ? 'bg-gradient-to-b from-black/50 to-transparent backdrop-blur-sm' : 'bg-transparent'}`}>
+        <div className="mx-auto max-w-screen-xl w-full flex items-center justify-between gap-2">
         {/* Logo - Always Left */}
         <Link 
           to="/"
@@ -79,12 +156,12 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
         </Link>
 
         {/* Navigation Container - Center */}
-        <nav className="hidden md:flex items-center gap-1 w-fit mx-auto rounded-full bg-brand-surface px-6 py-2 backdrop-blur-lg border border-white/10 shadow-lg">
+        <nav className="hidden md:flex items-center gap-1 w-fit mx-auto rounded-full bg-brand-surface px-4 md:px-6 py-2 backdrop-blur-lg border border-white/10 shadow-lg flex-shrink">
           {navItems.map(item => (
             <Link 
               key={item.name}
               to={item.path}
-              className={`relative px-4 py-2 text-sm font-medium transition-colors rounded-lg ${
+              className={`relative px-3 md:px-4 py-2 text-sm font-medium transition-colors rounded-lg whitespace-nowrap ${
                 isActive(item.path) ? 'text-yellow-400 dark:text-yellow-400 text-purple-600' : 'text-brand-secondary hover:text-brand-primary'
               }`}
             >
@@ -151,7 +228,166 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
         </nav>
 
         {/* Actions - Right Side */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+          {/* Search Icon/Bar - Desktop Only */}
+          <div className="hidden md:flex items-center relative max-w-full">
+            {!showSearchBar ? (
+              <button
+                onClick={() => setShowSearchBar(true)}
+                className={`p-2 transition-colors rounded-full ${
+                  isHomePage 
+                    ? 'text-white hover:text-white/80 hover:bg-white/20' 
+                    : 'text-brand-secondary hover:text-brand-primary hover:bg-white/10 dark:hover:bg-white/10'
+                }`}
+                aria-label="Search"
+                type="button"
+              >
+                <SearchIcon className="h-5 w-5" />
+              </button>
+            ) : (
+              <div className="relative">
+                <form onSubmit={handleSearch} className="flex items-center bg-white dark:bg-brand-surface border border-gray-300 dark:border-white/20 rounded-full px-4 py-2 shadow-lg">
+                  <SearchIcon className="h-5 w-5 text-brand-secondary mr-2 flex-shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowSuggestions(true)}
+                    placeholder="Search products..."
+                    className="bg-transparent outline-none text-sm text-brand-primary placeholder-brand-secondary w-32 md:w-48 lg:w-64"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setShowSuggestions(false);
+                      }}
+                      className="ml-2 text-brand-secondary hover:text-brand-primary flex-shrink-0"
+                      title="Clear search"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={closeSearchBar}
+                    className="ml-2 text-brand-secondary hover:text-brand-primary flex-shrink-0"
+                    title="Close search"
+                  >
+                    <XIcon className="h-5 w-5" />
+                  </button>
+                </form>
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && (showSearchBar) && (
+                  <div 
+                    ref={suggestionsRef}
+                    className="absolute top-full left-0 mt-2 bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 max-h-[60vh] overflow-y-auto w-[300px] md:w-[350px] lg:w-[400px]"
+                  >
+                    {/* Recent Searches */}
+                    {!searchQuery.trim() && recentSearches.length > 0 && (
+                      <div className="p-2">
+                        <div className="px-3 py-2 text-xs font-semibold text-brand-secondary uppercase tracking-wide">
+                          Recent Searches
+                        </div>
+                        {recentSearches.map((search, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg cursor-pointer group"
+                          >
+                            <div
+                              onClick={() => handleRecentSearchClick(search)}
+                              className="flex items-center gap-2 flex-1"
+                            >
+                              <ClockIcon className="w-4 h-4 text-brand-secondary" />
+                              <span className="text-sm text-brand-primary">{search}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeRecentSearch(search);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded transition-opacity"
+                            >
+                              <XIcon className="w-3 h-3 text-brand-secondary" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Loading State */}
+                    {suggestionsLoading && searchQuery.trim() && (
+                      <div className="p-4 text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-accent mx-auto"></div>
+                      </div>
+                    )}
+
+                    {/* Product Suggestions */}
+                    {!suggestionsLoading && searchQuery.trim() && suggestions.length > 0 && (
+                      <div className="p-2">
+                        <div className="px-3 py-2 text-xs font-semibold text-brand-secondary uppercase tracking-wide">
+                          Products
+                        </div>
+                        {suggestions.map((product) => (
+                          <div
+                            key={product.id}
+                            onClick={() => handleSuggestionClick(product.id)}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg cursor-pointer"
+                          >
+                            <div className="w-12 h-12 flex-shrink-0 bg-gray-100 dark:bg-white/5 rounded-lg overflow-hidden">
+                              {product.main_image_url ? (
+                                <img
+                                  src={product.main_image_url}
+                                  alt={product.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-brand-secondary">
+                                  <SearchIcon className="w-5 h-5" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-brand-primary truncate">
+                                {product.title}
+                              </p>
+                              <p className="text-xs text-brand-secondary">
+                                {formatCurrency(product.selling_price, currency)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        <div
+                          onClick={() => {
+                            if (searchQuery.trim()) {
+                              handleSearch(new Event('submit') as any);
+                            }
+                          }}
+                          className="flex items-center justify-center gap-2 px-3 py-2 mt-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg cursor-pointer text-sm text-brand-accent font-medium"
+                        >
+                          <SearchIcon className="w-4 h-4" />
+                          <span>View all results for "{searchQuery}"</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No Results */}
+                    {!suggestionsLoading && searchQuery.trim() && suggestions.length === 0 && (
+                      <div className="p-6 text-center">
+                        <SearchIcon className="w-8 h-8 mx-auto mb-2 text-brand-secondary opacity-50" />
+                        <p className="text-sm text-brand-secondary">No products found</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Theme Switcher - Desktop Only */}
           <button
             onClick={(e) => {
@@ -294,12 +530,12 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
         <>
           {/* Overlay */}
           <div 
-            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9998] md:hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998] md:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
           
           {/* Dropdown Menu */}
-          <div className="fixed top-20 right-4 left-4 bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-[9999] md:hidden overflow-hidden animate-dropdownIn max-h-[calc(100vh-6rem)] flex flex-col">
+          <div className="fixed top-20 right-4 w-80 max-h-[625px] bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl z-[9999] md:hidden overflow-hidden animate-dropdownIn flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
               <span className="text-lg font-display font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
@@ -311,6 +547,146 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
               >
                 <XIcon className="w-5 h-5 text-brand-secondary" />
               </button>
+            </div>
+
+            {/* Search Bar - Mobile */}
+            <div className="px-4 pt-4 pb-2 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+              <form onSubmit={(e) => {
+                handleSearch(e);
+                setMobileMenuOpen(false);
+              }}>
+                <div className="flex items-center bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg px-4 py-2.5">
+                  <SearchIcon className="h-5 w-5 text-brand-secondary mr-2 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowSuggestions(true)}
+                    placeholder="Search products..."
+                    className="bg-transparent outline-none text-sm text-brand-primary placeholder-brand-secondary w-full"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setShowSuggestions(false);
+                      }}
+                      className="ml-2 text-brand-secondary hover:text-brand-primary flex-shrink-0"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              {/* Mobile Suggestions Dropdown */}
+              {showSuggestions && mobileMenuOpen && (
+                <div className="mt-2 bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                  {/* Recent Searches */}
+                  {!searchQuery.trim() && recentSearches.length > 0 && (
+                    <div className="p-2">
+                      <div className="px-3 py-2 text-xs font-semibold text-brand-secondary uppercase tracking-wide">
+                        Recent
+                      </div>
+                      {recentSearches.map((search, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg group"
+                        >
+                          <div
+                            onClick={() => {
+                              handleRecentSearchClick(search);
+                              setMobileMenuOpen(false);
+                            }}
+                            className="flex items-center gap-2 flex-1"
+                          >
+                            <ClockIcon className="w-4 h-4 text-brand-secondary flex-shrink-0" />
+                            <span className="text-sm text-brand-primary">{search}</span>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeRecentSearch(search);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded transition-opacity flex-shrink-0"
+                          >
+                            <XIcon className="w-3 h-3 text-brand-secondary" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Loading State */}
+                  {suggestionsLoading && searchQuery.trim() && (
+                    <div className="p-4 text-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-accent mx-auto"></div>
+                    </div>
+                  )}
+
+                  {/* Product Suggestions */}
+                  {!suggestionsLoading && searchQuery.trim() && suggestions.length > 0 && (
+                    <div className="p-2">
+                      <div className="px-3 py-2 text-xs font-semibold text-brand-secondary uppercase tracking-wide">
+                        Products
+                      </div>
+                      {suggestions.map((product) => (
+                        <div
+                          key={product.id}
+                          onClick={() => {
+                            handleSuggestionClick(product.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg"
+                        >
+                          <div className="w-12 h-12 flex-shrink-0 bg-gray-100 dark:bg-white/5 rounded-lg overflow-hidden">
+                            {product.main_image_url ? (
+                              <img
+                                src={product.main_image_url}
+                                alt={product.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-brand-secondary">
+                                <SearchIcon className="w-5 h-5" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-brand-primary truncate">
+                              {product.title}
+                            </p>
+                            <p className="text-xs text-brand-secondary">
+                              {formatCurrency(product.selling_price, currency)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <div
+                        onClick={() => {
+                          if (searchQuery.trim()) {
+                            handleSearch(new Event('submit') as any);
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                        className="flex items-center justify-center gap-2 px-3 py-2 mt-1 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-sm text-brand-accent font-medium"
+                      >
+                        <SearchIcon className="w-4 h-4" />
+                        <span className="truncate">View all results</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Results */}
+                  {!suggestionsLoading && searchQuery.trim() && suggestions.length === 0 && (
+                    <div className="p-4 text-center">
+                      <SearchIcon className="w-6 h-6 mx-auto mb-2 text-brand-secondary opacity-50" />
+                      <p className="text-xs text-brand-secondary">No products found</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Scrollable Navigation Links */}

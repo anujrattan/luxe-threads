@@ -274,6 +274,73 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// Search products with full-text search
+router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { q, category, minPrice, maxPrice, limit = 20, offset = 0 } = req.query;
+    
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
+      return res.json({ results: [], total: 0 });
+    }
+    
+    const searchTerm = q.trim();
+    const searchLimit = parseInt(limit as string);
+    const searchOffset = parseInt(offset as string);
+    
+    // Build the query with full-text search
+    let query = supabaseAdmin
+      .from('products')
+      .select(`
+        *,
+        categories:category_id (
+          id,
+          name,
+          slug
+        )
+      `, { count: 'exact' });
+    
+    // Full-text search on title and description
+    // Using ilike for case-insensitive partial matching (good for short searches)
+    // For better performance with large datasets, you'd use PostgreSQL full-text search
+    query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+    
+    // Apply filters
+    if (category && typeof category === 'string') {
+      query = query.eq('category_id', category);
+    }
+    
+    if (minPrice && typeof minPrice === 'string') {
+      query = query.gte('selling_price', parseFloat(minPrice));
+    }
+    
+    if (maxPrice && typeof maxPrice === 'string') {
+      query = query.lte('selling_price', parseFloat(maxPrice));
+    }
+    
+    // Apply pagination
+    query = query
+      .order('created_at', { ascending: false })
+      .range(searchOffset, searchOffset + searchLimit - 1);
+    
+    const { data: products, error, count } = await query;
+    
+    if (error) throw error;
+    
+    const transformed = (products || []).map(p => transformProduct(p, p.categories));
+    
+    res.json({
+      results: transformed,
+      total: count || 0,
+      query: searchTerm,
+      page: Math.floor(searchOffset / searchLimit) + 1,
+      limit: searchLimit
+    });
+  } catch (error: any) {
+    console.error('Error searching products:', error);
+    next(error);
+  }
+});
+
 // Get best sellers (based on revenue from last 30 days)
 router.get('/best-sellers', async (req: Request, res: Response, next: NextFunction) => {
   try {
