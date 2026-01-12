@@ -18,6 +18,8 @@ import orderRoutes from "./routes/orders.js";
 import paymentRoutes from "./routes/payments.js";
 import analyticsRoutes from "./routes/analytics.js";
 import userRoutes from "./routes/users.js";
+import wishlistRoutes from "./routes/wishlists.js";
+import ratingsRoutes from "./routes/ratings.js";
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/wishlists", wishlistRoutes);
+app.use("/api/ratings", ratingsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
 // Error handling

@@ -1,5 +1,6 @@
 import { Product, Category } from '../types';
 import { authService } from './auth.js';
+import { getGuestSessionId } from '../utils/guestSession';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
@@ -13,6 +14,12 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    // For guest users, send guest session ID
+    const guestSessionId = getGuestSessionId();
+    if (guestSessionId) {
+      headers['X-Guest-Session-Id'] = guestSessionId;
+    }
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -472,6 +479,64 @@ const api = {
       setPrimaryAddress: async (addressId: string): Promise<any> => {
         return apiCall(`/users/addresses/${addressId}/set-primary`, {
           method: 'PUT',
+        });
+      },
+
+      // Wishlist
+      getWishlist: async (): Promise<any> => {
+        return apiCall('/wishlists');
+      },
+
+      addToWishlist: async (productId: string): Promise<any> => {
+        return apiCall('/wishlists', {
+          method: 'POST',
+          body: JSON.stringify({ product_id: productId }),
+        });
+      },
+
+      removeFromWishlist: async (productId: string): Promise<any> => {
+        return apiCall(`/wishlists/${productId}`, {
+          method: 'DELETE',
+        });
+      },
+
+      bulkAddToWishlist: async (productIds: string[]): Promise<any> => {
+        return apiCall('/wishlists/bulk', {
+          method: 'POST',
+          body: JSON.stringify({ product_ids: productIds }),
+        });
+      },
+
+      clearWishlist: async (): Promise<any> => {
+        return apiCall('/wishlists', {
+          method: 'DELETE',
+        });
+      },
+
+      // Ratings
+      submitRating: async (ratingData: { product_id: string; order_id: string; rating: number }): Promise<any> => {
+        return apiCall('/ratings', {
+          method: 'POST',
+          body: JSON.stringify(ratingData),
+        });
+      },
+
+      getProductRatings: async (productId: string): Promise<any> => {
+        return apiCall(`/ratings/product/${productId}`);
+      },
+
+      getOrderRatings: async (orderNumber: string): Promise<any> => {
+        return apiCall(`/ratings/order/${orderNumber}`);
+      },
+
+      canRateProduct: async (productId: string, orderNumber: string): Promise<any> => {
+        return apiCall(`/ratings/can-rate/${productId}/${orderNumber}`);
+      },
+
+      getOrderByNumber: async (orderNumber: string): Promise<any> => {
+        return apiCall(`/orders/lookup`, {
+          method: 'POST',
+          body: JSON.stringify({ orderNumber }),
         });
       },
 

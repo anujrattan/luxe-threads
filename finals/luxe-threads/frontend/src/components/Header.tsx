@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBagIcon, UserIcon, ChevronDownIcon, LogOutIcon, SettingsIcon, SunIcon, MoonIcon, XIcon, SearchIcon, ClockIcon } from './icons';
+import { ShoppingBagIcon, HeartIcon, UserIcon, ChevronDownIcon, LogOutIcon, SettingsIcon, SunIcon, MoonIcon, XIcon, SearchIcon, ClockIcon } from './icons';
 import { Category } from '../types';
 import api from '../services/api';
 import { useApp } from '../context/AppContext';
@@ -23,7 +23,7 @@ const HamburgerIcon: React.FC<{ className?: string }> = ({ className }) => (
 export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cartAnimationKey }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isAdmin, logout, theme, toggleTheme, currency } = useApp();
+  const { user, isAuthenticated, isAdmin, logout, theme, toggleTheme, currency, wishlistItemCount } = useApp();
   const [categories, setCategories] = useState<Category[]>([]);
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -410,6 +410,25 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
           </button>
 
           {/* Cart Icon - Always Visible */}
+          {/* Wishlist Button */}
+          <button 
+            onClick={() => navigate('/wishlist')} 
+            className={`relative p-2 transition-colors rounded-full ${
+              isHomePage 
+                ? 'text-white hover:text-white/80 hover:bg-white/20' 
+                : 'text-brand-secondary hover:text-brand-primary hover:bg-white/10 dark:hover:bg-white/10'
+            }`}
+            aria-label="Wishlist"
+          >
+            <HeartIcon className="h-5 w-5" />
+            {wishlistItemCount > 0 && (
+              <span className="absolute top-0 right-0 block h-4 w-4 rounded-full bg-pink-500 text-white text-[10px] font-medium flex items-center justify-center transform translate-x-1/3 -translate-y-1/3">
+                {wishlistItemCount}
+              </span>
+            )}
+          </button>
+          
+          {/* Shopping Cart Button */}
           <button 
             onClick={() => navigate('/cart')} 
             className={`relative p-2 transition-colors rounded-full ${

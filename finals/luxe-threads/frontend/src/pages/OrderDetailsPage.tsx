@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui';
+import { RateProductModal } from '../components/RateProductModal';
+import { StarRating } from '../components/StarRating';
 import api from '../services/api';
 import { useApp } from '../context/AppContext';
 
@@ -13,6 +15,9 @@ export const OrderDetailsPage: React.FC = () => {
   const [products, setProducts] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userRatings, setUserRatings] = useState<Record<string, number>>({});
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!orderNumber) {
@@ -52,6 +57,20 @@ export const OrderDetailsPage: React.FC = () => {
             }
           });
           setProducts(productsMap);
+          
+          // Load user ratings for this order (authenticated or guest)
+          try {
+            const ratingsResponse = await api.getOrderRatings(orderNumber);
+            if (ratingsResponse.success) {
+              const ratingsMap: Record<string, number> = {};
+              ratingsResponse.ratings.forEach((r: any) => {
+                ratingsMap[r.product_id] = r.rating;
+              });
+              setUserRatings(ratingsMap);
+            }
+          } catch (err) {
+            console.error('Failed to load ratings:', err);
+          }
         } else {
           setError(response.message || 'Order not found');
         }
@@ -194,9 +213,40 @@ export const OrderDetailsPage: React.FC = () => {
                       <p>Quantity: {item.quantity}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-brand-primary">{formatPrice(item.total_price)}</p>
-                    <p className="text-sm text-brand-secondary">{formatPrice(item.unit_price)} each</p>
+                  <div className="text-right flex flex-col items-end gap-2">
+                    <div>
+                      <p className="font-semibold text-brand-primary">{formatPrice(item.total_price)}</p>
+                      <p className="text-sm text-brand-secondary">{formatPrice(item.unit_price)} each</p>
+                    </div>
+                    
+                    {/* Rating Button (only for delivered orders) */}
+                    {order.status === 'delivered' && item.product_id && (
+                      <div className="mt-2">
+                        {userRatings[item.product_id] ? (
+                          <button
+                            onClick={() => {
+                              setSelectedProduct({ id: item.product_id, name: item.product_name });
+                              setRatingModalOpen(true);
+                            }}
+                            className="flex flex-col items-end gap-1 text-xs hover:opacity-80 transition-opacity"
+                          >
+                            <span className="text-brand-secondary">Your rating:</span>
+                            <StarRating rating={userRatings[item.product_id]} readonly size="sm" />
+                          </button>
+                        ) : (
+                          <Button
+                            onClick={() => {
+                              setSelectedProduct({ id: item.product_id, name: item.product_name });
+                              setRatingModalOpen(true);
+                            }}
+                            variant="outline"
+                            className="text-xs py-1 px-3"
+                          >
+                            Rate Product
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -280,6 +330,25 @@ export const OrderDetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Rate Product Modal */}
+      {selectedProduct && (
+        <RateProductModal
+          isOpen={ratingModalOpen}
+          onClose={() => {
+            setRatingModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          productId={selectedProduct.id}
+          productName={selectedProduct.name}
+          orderNumber={orderNumber!}
+          onSuccess={(rating) => {
+            setUserRatings((prev) => ({ ...prev, [selectedProduct.id]: rating }));
+            setRatingModalOpen(false);
+            setSelectedProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 };

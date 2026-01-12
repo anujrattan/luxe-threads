@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Card } from './ui';
-import { RecycleIcon, SaleTagIcon } from './icons';
+import { RecycleIcon, SaleTagIcon, HeartIcon } from './icons';
+import { StarRating } from './StarRating';
 import { formatCurrency } from '../utils/currency';
 import { useApp } from '../context/AppContext';
 import { getCssColorValue, getColorName } from '../utils/colorUtils';
+import { useToast } from '../context/ToastContext';
 
 interface ProductCardProps {
   product: Product;
@@ -13,8 +15,12 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const navigate = useNavigate();
-  const { currency } = useApp();
+  const { currency, isInWishlist, addToWishlist, removeFromWishlist } = useApp();
+  const { showToast } = useToast();
   const [imageError, setImageError] = useState(false);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+  
+  const inWishlist = isInWishlist(product.id);
   
   // Calculate prices exactly like ProductCardPreview
   const sellingPrice = parseFloat(String(product.selling_price || 0));
@@ -47,6 +53,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const discountText = hasAnyDiscount ? `Save ${formatCurrency(totalSavings, currency, { showDecimals: false })}` : undefined;
   const uspTag = product.usp_tag || undefined;
 
+  const handleWishlistToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation when clicking heart
+    
+    if (isWishlistLoading) return;
+    
+    setIsWishlistLoading(true);
+    try {
+      if (inWishlist) {
+        await removeFromWishlist(product.id);
+        showToast('Removed from wishlist', 'success');
+      } else {
+        await addToWishlist(product.id);
+        showToast('Added to wishlist', 'success');
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update wishlist', 'error');
+    } finally {
+      setIsWishlistLoading(false);
+    }
+  };
+
   return (
     <Card 
       className="cursor-pointer animate-popIn bg-card-light-bg dark:bg-brand-surface border-gray-200/50 dark:border-white/10 border shadow-md dark:shadow-lg hover:shadow-xl transition-shadow !text-card-light-text-primary dark:text-brand-primary w-full overflow-hidden" 
@@ -77,15 +104,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </div>
           )}
         </div>
-        {/* Top Right: Sale Badge */}
-        {onSale && (
-          <div className="absolute top-2 right-2">
+        {/* Top Right: Sale Badge & Wishlist */}
+        <div className="absolute top-2 right-2 flex flex-col gap-2 items-end">
+          {onSale && (
             <div className="flex items-center gap-1 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full px-2 py-1 shadow-lg animate-pulse">
               <SaleTagIcon className="w-3 h-3" />
               <span className="text-xs font-bold">SALE</span>
             </div>
-          </div>
-        )}
+          )}
+          {/* Wishlist Heart Icon */}
+          <button
+            onClick={handleWishlistToggle}
+            disabled={isWishlistLoading}
+            className={`p-2 rounded-full transition-all duration-200 ${
+              inWishlist 
+                ? 'bg-pink-500 text-white shadow-lg' 
+                : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800'
+            } ${isWishlistLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}`}
+            title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+            aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            <HeartIcon 
+              className={`w-4 h-4 sm:w-5 sm:h-5 ${inWishlist ? 'fill-current' : ''}`}
+            />
+          </button>
+        </div>
       </div>
       <div className="p-2 sm:p-3 flex flex-col min-w-0">
         {categoryName && (
@@ -98,6 +141,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             {product.title || product.name}
           </h3>
         )}
+        
+        {/* Rating Display */}
+        {product.rating > 0 && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <StarRating rating={product.rating} readonly size="sm" />
+            <span className="text-xs text-card-light-text-secondary">
+              ({product.rating_count || 0})
+            </span>
+          </div>
+        )}
+        
         {product.description && (
           <p className="text-xs text-card-light-text-secondary mt-1 h-8 overflow-hidden line-clamp-2">
             {product.description}

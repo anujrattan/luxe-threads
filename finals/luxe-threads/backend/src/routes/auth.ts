@@ -9,8 +9,76 @@ import { generateToken } from '../utils/jwt.js';
 import { supabaseAdmin, supabaseAnon } from '../services/supabase.js';
 import { config } from '../config/index.js';
 import jwt from 'jsonwebtoken';
+import * as wishlistCache from '../services/wishlistCache.js';
 
 const router = Router();
+
+/**
+ * Helper: Merge guest wishlist to user on login/signup
+ * Transfers guest wishlist from Redis to user's DB + Redis
+ * Clears guest wishlist after merge
+ */
+async function mergeGuestWishlistOnAuth(userId: string, guestSessionId?: string) {
+  if (!guestSessionId) return;
+  
+  try {
+    // Get guest wishlist from Redis
+    const guestWishlist = await wishlistCache.getGuestWishlist(guestSessionId);
+    
+    if (guestWishlist.length === 0) {
+      return; // No guest wishlist to merge
+    }
+    
+    // Get user record from users table
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", userId)
+      .single();
+    
+    if (userError || !user) {
+      console.error('User not found for wishlist merge:', userError);
+      return;
+    }
+    
+    // Get existing user wishlist from DB
+    const { data: existingWishlist } = await supabaseAdmin
+      .from("wishlists")
+      .select("product_id")
+      .eq("user_id", user.id);
+    
+    const existingProductIds = new Set(existingWishlist?.map((item: any) => item.product_id) || []);
+    
+    // Filter out products already in user's wishlist
+    const newProductIds = guestWishlist.filter(productId => !existingProductIds.has(productId));
+    
+    if (newProductIds.length > 0) {
+      // Insert new products into DB
+      const insertData = newProductIds.map(productId => ({
+        user_id: user.id,
+        product_id: productId,
+      }));
+      
+      await supabaseAdmin
+        .from("wishlists")
+        .insert(insertData);
+    }
+    
+    // Merge in Redis (combine existing + new)
+    const mergedProductIds = Array.from(new Set([...Array.from(existingProductIds), ...guestWishlist]));
+    const userWishlistKey = wishlistCache.getUserWishlistKey(userId);
+    await wishlistCache.setWishlistInCache(userWishlistKey, mergedProductIds);
+    
+    // Clear guest wishlist
+    const guestWishlistKey = wishlistCache.getGuestWishlistKey(guestSessionId);
+    await wishlistCache.clearWishlistCache(guestWishlistKey);
+    
+    console.log(`Merged ${newProductIds.length} guest wishlist items for user ${userId}`);
+  } catch (error) {
+    console.error('Error merging guest wishlist:', error);
+    // Don't fail the login/signup if wishlist merge fails
+  }
+}
 
 /**
  * Signup endpoint
@@ -137,6 +205,12 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       role: userRole,
     });
     
+    // Merge guest wishlist if present (for new signups)
+    const guestSessionId = req.headers['x-guest-session-id'] as string;
+    if (guestSessionId) {
+      await mergeGuestWishlistOnAuth(authData.user.id, guestSessionId);
+    }
+    
     res.status(201).json({
       token,
       user: {
@@ -192,6 +266,12 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       email: authData.user.email,
       role: userRole,
     });
+    
+    // Merge guest wishlist if present
+    const guestSessionId = req.headers['x-guest-session-id'] as string;
+    if (guestSessionId) {
+      await mergeGuestWishlistOnAuth(authData.user.id, guestSessionId);
+    }
     
     res.json({
       token,

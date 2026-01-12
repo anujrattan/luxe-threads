@@ -4,13 +4,17 @@ import { Product, CartItem } from '../types';
 import api from '../services/api';
 import { Button } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
+import { RatingBreakdown } from '../components/RatingBreakdown';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { formatCurrency } from '../utils/currency';
 import { getCssColorValue, getColorName } from '../utils/colorUtils';
+import { HeartIcon } from '../components/icons';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { addToCart, currency } = useApp();
+  const { addToCart, currency, isInWishlist, addToWishlist, removeFromWishlist } = useApp();
+  const { showToast } = useToast();
   
   // All hooks must be declared before any conditional returns
   const [product, setProduct] = useState<Product | null>(null);
@@ -20,6 +24,7 @@ export const ProductDetailPage: React.FC = () => {
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [addedToCart, setAddedToCart] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -130,6 +135,25 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
+  const handleWishlistToggle = async () => {
+    if (!product || isWishlistLoading) return;
+    
+    setIsWishlistLoading(true);
+    try {
+      if (isInWishlist(product.id)) {
+        await removeFromWishlist(product.id);
+        showToast('Removed from wishlist', 'success');
+      } else {
+        await addToWishlist(product.id);
+        showToast('Added to wishlist', 'success');
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update wishlist', 'error');
+    } finally {
+      setIsWishlistLoading(false);
+    }
+  };
+
   // Filter colors to only show those that exist in variants
   const availableColors = product.variants?.colors || [];
   
@@ -206,6 +230,13 @@ export const ProductDetailPage: React.FC = () => {
           
           <p className="mt-6 text-base text-brand-secondary leading-relaxed">{product.description}</p>
           
+          {/* Rating Breakdown */}
+          {product.rating_count > 0 && (
+            <div className="mt-6">
+              <RatingBreakdown productId={product.id} />
+            </div>
+          )}
+          
           <div className="mt-8 space-y-6">
             {/* Color Selector - Only show colors that exist */}
             {availableColors.length > 0 && availableColors[0] !== 'N/A' && (
@@ -271,9 +302,27 @@ export const ProductDetailPage: React.FC = () => {
             )}
           </div>
           
-          <Button onClick={handleAddToCart} className="mt-10 w-full py-3 text-base">
-            {addedToCart ? 'Added!' : 'Add to cart'}
-          </Button>
+          {/* Add to Cart & Wishlist Buttons */}
+          <div className="mt-10 flex gap-3">
+            <Button onClick={handleAddToCart} className="flex-1 py-3 text-base">
+              {addedToCart ? 'Added!' : 'Add to cart'}
+            </Button>
+            <button
+              onClick={handleWishlistToggle}
+              disabled={isWishlistLoading}
+              className={`px-4 py-3 rounded-lg transition-all duration-200 ${
+                isInWishlist(product.id) 
+                  ? 'bg-pink-500 text-white shadow-lg hover:bg-pink-600' 
+                  : 'bg-brand-surface border-2 border-gray-300 dark:border-white/30 text-brand-primary hover:border-pink-500 hover:text-pink-500'
+              } ${isWishlistLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+              title={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+              aria-label={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+            >
+              <HeartIcon 
+                className={`w-6 h-6 ${isInWishlist(product.id) ? 'fill-current' : ''}`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 

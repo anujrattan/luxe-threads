@@ -78,7 +78,8 @@ const transformProduct = (dbProduct: any, category?: any) => {
     mockup_images: dbProduct.mockup_images || [],
     mockup_video_url: dbProduct.mockup_video_url || undefined,
     rating: dbProduct.rating || undefined,
-    review_count: dbProduct.review_count || dbProduct.reviewCount || 0,
+    rating_count: dbProduct.rating_count || 0,
+    review_count: dbProduct.rating_count || dbProduct.review_count || dbProduct.reviewCount || 0,
     variants: dbProduct.variants || { sizes: [], colors: [] },
     variants_with_mockups: dbProduct.variants_with_mockups || undefined,
     created_at: dbProduct.created_at,
@@ -90,7 +91,7 @@ const transformProduct = (dbProduct: any, category?: any) => {
     imageUrl: dbProduct.main_image_url || dbProduct.imageUrl || dbProduct.image_url,
     category: categorySlug,
     tags: dbProduct.usp_tag ? [dbProduct.usp_tag] : [],
-    reviewCount: dbProduct.review_count || dbProduct.reviewCount || 0,
+    reviewCount: dbProduct.rating_count || dbProduct.review_count || dbProduct.reviewCount || 0,
     discount: hasAnyDiscount ? `Save $${totalSavings.toFixed(0)}` : undefined,
   };
 };

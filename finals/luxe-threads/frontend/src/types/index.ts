@@ -20,6 +20,7 @@ export interface Product {
   mockup_images?: string[];
   mockup_video_url?: string;
   rating?: number;
+  rating_count?: number;
   review_count?: number;
   variants: {
     sizes: string[];

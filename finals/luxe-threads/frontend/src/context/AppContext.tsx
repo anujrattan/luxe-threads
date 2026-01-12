@@ -11,9 +11,11 @@ import { authService } from '../services/auth';
 import api from '../services/api';
 import { CurrencyCode, getStoredCurrency, saveCurrencyPreference } from '../utils/currency';
 import { isCategoryAllowed } from '../utils/cookieConsent';
+import { clearGuestSession } from '../utils/guestSession';
 
 type Theme = 'dark' | 'light';
 const THEME_STORAGE_KEY = 'luxe-threads-theme';
+const WISHLIST_STORAGE_KEY = 'luxe-threads-wishlist';
 
 const getStoredTheme = (): Theme => {
   if (typeof window === 'undefined') return 'dark';
@@ -52,6 +54,12 @@ interface AppContextType {
   clearCart: () => void;
   cartItemCount: number;
   cartAnimationKey: number;
+  wishlist: string[];
+  wishlistItemCount: number;
+  addToWishlist: (productId: string) => Promise<void>;
+  removeFromWishlist: (productId: string) => Promise<void>;
+  isInWishlist: (productId: string) => boolean;
+  loadWishlist: () => Promise<void>;
   user: User | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -83,6 +91,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     const savedCart = localStorage.getItem(CART_STORAGE_KEY);
     return savedCart ? JSON.parse(savedCart) : [];
   });
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    // Load from localStorage for guests
+    const savedWishlist = localStorage.getItem(WISHLIST_STORAGE_KEY);
+    return savedWishlist ? JSON.parse(savedWishlist) : [];
+  });
   const [user, setUser] = useState<User | null>(null);
   const [cartAnimationKey, setCartAnimationKey] = useState(0);
   const [currency, setCurrencyState] = useState<CurrencyCode>(() => getStoredCurrency());
@@ -105,7 +118,80 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const logout = React.useCallback(() => {
     authService.removeToken();
     setUser(null);
+    // Clear wishlist on logout (will reload from localStorage if guest)
+    setWishlist([]);
   }, []);
+
+  // Wishlist functions
+  const loadWishlist = React.useCallback(async () => {
+    try {
+      // Try to load from API first (works for both guest and authenticated via hybrid auth)
+      const response = await api.getWishlist();
+      const productIds = response.items.map((item: any) => item.product_id);
+      setWishlist(productIds);
+      // Sync to localStorage
+      localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(productIds));
+    } catch (error) {
+      console.error('Failed to load wishlist from API, using localStorage:', error);
+      // Fallback to localStorage
+      const savedWishlist = localStorage.getItem(WISHLIST_STORAGE_KEY);
+      setWishlist(savedWishlist ? JSON.parse(savedWishlist) : []);
+    }
+  }, []);
+
+  const addToWishlist = React.useCallback(async (productId: string) => {
+    // Check if already in wishlist
+    if (wishlist.includes(productId)) {
+      return;
+    }
+
+    // Check limit (25 items)
+    if (wishlist.length >= 25) {
+      throw new Error('Wishlist is full. Maximum 25 items allowed.');
+    }
+
+    try {
+      // Call API (works for both guest and authenticated users via hybrid auth)
+      // Backend handles Redis + DB storage
+      await api.addToWishlist(productId);
+      
+      // Update local state + localStorage (fast cache)
+      const updatedWishlist = [...wishlist, productId];
+      setWishlist(updatedWishlist);
+      localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(updatedWishlist));
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to add to wishlist');
+    }
+  }, [wishlist]);
+
+  const removeFromWishlist = React.useCallback(async (productId: string) => {
+    try {
+      // Call API (works for both guest and authenticated users via hybrid auth)
+      // Backend handles Redis + DB storage
+      await api.removeFromWishlist(productId);
+      
+      // Update local state + localStorage (fast cache)
+      const updatedWishlist = wishlist.filter(id => id !== productId);
+      setWishlist(updatedWishlist);
+      localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(updatedWishlist));
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to remove from wishlist');
+    }
+  }, [wishlist]);
+
+  const isInWishlist = React.useCallback((productId: string): boolean => {
+    return wishlist.includes(productId);
+  }, [wishlist]);
+
+  // Clear guest session after login (backend handles merge automatically)
+  const clearGuestSessionAfterAuth = React.useCallback(async () => {
+    // Backend has already merged guest wishlist to user during login/signup
+    // Just clear the guest session ID from localStorage
+    clearGuestSession();
+    
+    // Reload wishlist from API (now contains merged data)
+    await loadWishlist();
+  }, [loadWishlist]);
 
   // Load user on mount if token exists
   useEffect(() => {
@@ -114,15 +200,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         try {
           const userData = await api.getCurrentUser();
           setUser(userData);
+          // Clear guest session and load wishlist (backend has already merged)
+          await clearGuestSessionAfterAuth();
         } catch (error) {
           // Token invalid or expired, clear it
           authService.removeToken();
           setUser(null);
         }
+      } else {
+        // Load guest wishlist from localStorage/API
+        await loadWishlist();
       }
     };
     loadUser();
-  }, []);
+  }, [loadWishlist, clearGuestSessionAfterAuth]);
 
   // Check token expiration every minute
   useEffect(() => {
@@ -227,6 +318,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   const cartItemCount = cart.reduce((count, item) => count + item.quantity, 0);
+  const wishlistItemCount = wishlist.length;
   const isAuthenticated = !!user;
   const isAdmin = user?.role === 'admin';
 
@@ -241,6 +333,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         clearCart,
         cartItemCount,
         cartAnimationKey,
+        wishlist,
+        wishlistItemCount,
+        addToWishlist,
+        removeFromWishlist,
+        isInWishlist,
+        loadWishlist,
         user,
         isAuthenticated,
         isAdmin,
