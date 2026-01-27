@@ -140,15 +140,7 @@ export const CategoryForm: React.FC<{ category?: Category | null, onSave: () => 
   }
 
   return (
-    <Card className="p-8 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h3 className="text-2xl font-display font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-          {category ? 'Edit Category' : 'Create New Category'}
-        </h3>
-        <p className="text-sm text-brand-secondary">Add a new category to your store</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
         {/* Category Name */}
         <div>
           <label className="block text-sm font-semibold text-brand-primary mb-2">
@@ -359,6 +351,5 @@ export const CategoryForm: React.FC<{ category?: Category | null, onSave: () => 
           </Button>
         </div>
       </form>
-    </Card>
   );
 };

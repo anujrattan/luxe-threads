@@ -42,21 +42,21 @@ CREATE POLICY "Anyone can view ratings" ON product_ratings
 -- Users can insert their own ratings
 CREATE POLICY "Users can insert own ratings" ON product_ratings
   FOR INSERT WITH CHECK (
-    auth_user_id = (SELECT auth_user_id FROM users WHERE id = user_id)
+    auth.uid() = (SELECT users.auth_user_id FROM users WHERE users.id = user_id)
     OR auth.role() = 'service_role'
   );
 
 -- Users can update their own ratings
 CREATE POLICY "Users can update own ratings" ON product_ratings
   FOR UPDATE USING (
-    auth_user_id = (SELECT auth_user_id FROM users WHERE id = user_id)
+    auth.uid() = (SELECT users.auth_user_id FROM users WHERE users.id = user_id)
     OR auth.role() = 'service_role'
   );
 
 -- Users can delete their own ratings
 CREATE POLICY "Users can delete own ratings" ON product_ratings
   FOR DELETE USING (
-    auth_user_id = (SELECT auth_user_id FROM users WHERE id = user_id)
+    auth.uid() = (SELECT users.auth_user_id FROM users WHERE users.id = user_id)
     OR auth.role() = 'service_role'
   );
 

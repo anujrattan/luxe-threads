@@ -771,7 +771,7 @@ router.post("/lookup", async (req: Request, res: Response, next: NextFunction) =
 router.put("/:orderNumber/status", authenticate, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orderNumber } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, shipping_partner, tracking_number, tracking_url } = req.body;
     const userId = (req as any).userId;
     const userEmail = (req as any).userEmail;
 
@@ -784,7 +784,7 @@ router.put("/:orderNumber/status", authenticate, requireAdmin, async (req: Reque
       });
     }
 
-    // Fetch the order
+    // Fetch the order first (needed for validation)
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .select("id, order_number, status")
@@ -798,11 +798,24 @@ router.put("/:orderNumber/status", authenticate, requireAdmin, async (req: Reque
       });
     }
 
-    // Don't update if status is the same
-    if (order.status === status) {
+    // Validate tracking info when status is being set to "shipped"
+    // (Allow updates to existing "shipped" orders without requiring tracking info if status isn't changing)
+    if (status === 'shipped' && order.status !== 'shipped') {
+      // At least one tracking field should be provided when changing TO "shipped"
+      if (!shipping_partner && !tracking_number && !tracking_url) {
+        return res.status(400).json({
+          success: false,
+          message: "Shipping partner, tracking number, or tracking URL is required when status is 'shipped'",
+        });
+      }
+    }
+
+    // Don't update if status is the same AND no tracking info is being updated
+    const hasTrackingInfo = shipping_partner || tracking_number || tracking_url;
+    if (order.status === status && !hasTrackingInfo) {
       return res.status(400).json({
         success: false,
-        message: "Order already has this status",
+        message: "Order already has this status and no tracking info provided",
       });
     }
 
@@ -817,10 +830,31 @@ router.put("/:orderNumber/status", authenticate, requireAdmin, async (req: Reque
 
     const changedByName = profile?.name || userEmail?.split("@")[0] || "Admin";
 
-    // Update order status
+    // Prepare update data
+    const updateData: any = {};
+    
+    // Only update status if it changed
+    if (order.status !== status) {
+      updateData.status = status;
+    }
+    
+    // Add tracking info if status is "shipped" or "delivered" and fields are provided
+    if (status === 'shipped' || status === 'delivered' || order.status === 'shipped' || order.status === 'delivered') {
+      if (shipping_partner !== undefined) {
+        updateData.shipping_partner = shipping_partner || null;
+      }
+      if (tracking_number !== undefined) {
+        updateData.tracking_number = tracking_number || null;
+      }
+      if (tracking_url !== undefined) {
+        updateData.tracking_url = tracking_url || null;
+      }
+    }
+
+    // Update order status and tracking info
     const { error: updateError } = await supabaseAdmin
       .from("orders")
-      .update({ status })
+      .update(updateData)
       .eq("id", order.id);
 
     if (updateError) {
@@ -829,6 +863,16 @@ router.put("/:orderNumber/status", authenticate, requireAdmin, async (req: Reque
         success: false,
         message: "Failed to update order status",
       });
+    }
+
+    // Invalidate Redis cache for this order
+    try {
+      const { cache } = await import("../services/redis.js");
+      await cache.del(`order:${orderNumber}`);
+      await cache.del('orders:last30days'); // Invalidate orders list cache
+    } catch (cacheError) {
+      console.error("Error invalidating cache:", cacheError);
+      // Don't fail the request if cache invalidation fails
     }
 
     // Create status history entry
@@ -848,13 +892,23 @@ router.put("/:orderNumber/status", authenticate, requireAdmin, async (req: Reque
       // Don't fail the request if history logging fails, but log it
     }
 
+    // Fetch updated order to return complete data
+    const { data: updatedOrder } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, status, shipping_partner, tracking_number, tracking_url")
+      .eq("id", order.id)
+      .single();
+
     res.json({
       success: true,
       message: "Order status updated successfully",
-      order: {
+      order: updatedOrder || {
         id: order.id,
         order_number: order.order_number,
         status,
+        shipping_partner: updateData.shipping_partner,
+        tracking_number: updateData.tracking_number,
+        tracking_url: updateData.tracking_url,
       },
     });
   } catch (error: any) {

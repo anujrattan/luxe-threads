@@ -5,11 +5,14 @@ import api from '../services/api';
 import { Button } from '../components/ui';
 import { ProductCard } from '../components/ProductCard';
 import { RatingBreakdown } from '../components/RatingBreakdown';
+import { StarRating } from '../components/StarRating';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency } from '../utils/currency';
 import { getCssColorValue, getColorName } from '../utils/colorUtils';
 import { HeartIcon } from '../components/icons';
+import { SEOHead } from '../components/SEOHead';
+import { StructuredData, createProductSchema, createBreadcrumbSchema } from '../components/StructuredData';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -160,8 +163,51 @@ export const ProductDetailPage: React.FC = () => {
   // Filter sizes to only show those that exist in variants
   const availableSizes = product.variants?.sizes || [];
 
+  // SEO Data
+  const productTitle = product?.name || product?.title || 'Product';
+  const productDescription = product?.description || `${productTitle} - Premium quality ${product?.category_name || 'apparel'} from Luxe Threads.`;
+  const productImage = product?.main_image_url || product?.imageUrl || '';
+  const productPrice = finalPrice;
+  
+  const seoData = {
+    title: `${productTitle} - Premium ${product?.category_name || 'Apparel'} | Luxe Threads`,
+    description: truncateDescription(productDescription),
+    keywords: `${productTitle}, premium ${product?.category_name || 'apparel'}, luxury clothing, custom ${product?.category_name || 'apparel'}, ${product?.category_name || 'apparel'} online`,
+    image: productImage,
+    type: 'product' as const,
+    url: `${DEFAULT_SITE_URL}/product/${product?.id}`,
+  };
+
+  // Breadcrumb schema
+  const breadcrumbItems = [
+    { name: 'Home', url: DEFAULT_SITE_URL },
+    { name: product?.category_name || 'Products', url: `${DEFAULT_SITE_URL}/category/${product?.category_slug || 'all'}` },
+    { name: productTitle, url: `${DEFAULT_SITE_URL}/product/${product?.id}` },
+  ];
+
+  // Product schema
+  const productSchema = product ? createProductSchema({
+    id: product.id,
+    title: productTitle,
+    description: productDescription,
+    price: productPrice,
+    currency: currency,
+    image: productImage,
+    availability: 'https://schema.org/InStock',
+    brand: DEFAULT_SITE_NAME,
+    category: product.category_name,
+  }) : null;
+
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fadeIn">
+    <>
+      {product && (
+        <>
+          <SEOHead {...seoData} />
+          {productSchema && <StructuredData data={productSchema} />}
+          <StructuredData data={createBreadcrumbSchema(breadcrumbItems)} />
+        </>
+      )}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fadeIn">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         {/* Product Image Section */}
         <div>
@@ -228,28 +274,37 @@ export const ProductDetailPage: React.FC = () => {
             )}
           </div>
           
-          <p className="mt-6 text-base text-brand-secondary leading-relaxed">{product.description}</p>
-          
-          {/* Rating Breakdown */}
-          {product.rating_count > 0 && (
-            <div className="mt-6">
-              <RatingBreakdown productId={product.id} />
+          {/* Star Rating Display */}
+          {product.rating > 0 && (
+            <div className="flex items-center gap-2 mt-3">
+              <StarRating rating={product.rating} readonly size="md" />
+              <span className="text-sm text-brand-secondary">
+                ({product.rating_count || 0} {product.rating_count === 1 ? 'rating' : 'ratings'})
+              </span>
             </div>
           )}
+          
+          <p className="mt-6 text-base text-brand-secondary leading-relaxed">{product.description}</p>
+          
+          {/* Rating Breakdown - Always show (component handles empty state) */}
+          <div className="mt-6">
+            <RatingBreakdown productId={product.id} />
+          </div>
           
           <div className="mt-8 space-y-6">
             {/* Color Selector - Only show colors that exist */}
             {availableColors.length > 0 && availableColors[0] !== 'N/A' && (
               <div>
-                <h3 className="text-sm font-medium text-brand-primary">
-                  Color: <span className="font-bold">{getColorName(selectedColor)}</span>
+                <h3 className="text-sm font-medium text-brand-primary mb-3">
+                  Color
                 </h3>
-                <div className="flex items-center space-x-3 mt-2">
+                <div className="flex items-start gap-4 flex-wrap">
                   {availableColors.map(color => {
                     // Get mockup images for this color to update main image when selected
                     const colorMockups = variantsWithMockups?.[color] || [];
                     const colorMainImage = product.main_image_url || product.imageUrl || '';
                     const colorImages = [colorMainImage, ...colorMockups.slice(0, 4)].filter(img => img);
+                    const isSelected = selectedColor === color;
                     
                     return (
                       <button 
@@ -261,17 +316,27 @@ export const ProductDetailPage: React.FC = () => {
                             setSelectedImage(colorImages[0]);
                           }
                         }}
-                        className={`relative -m-0.5 flex items-center justify-center rounded-full p-0.5 focus:outline-none transition-transform transform hover:scale-110 ${
-                          selectedColor === color 
-                            ? 'ring-2 ring-offset-2 ring-brand-accent ring-offset-brand-bg' 
-                            : ''
+                        className={`flex flex-col items-center gap-2 focus:outline-none transition-all ${
+                          isSelected ? 'opacity-100' : 'opacity-70 hover:opacity-100'
                         }`}
                       >
-                        <span 
-                          className={`h-8 w-8 rounded-full border border-white/20`} 
-                          style={{ backgroundColor: getCssColorValue(color) }}
-                          title={getColorName(color)}
-                        ></span>
+                        <div className={`relative flex items-center justify-center rounded-full p-0.5 transition-transform transform hover:scale-110 ${
+                          isSelected 
+                            ? 'ring-2 ring-offset-2 ring-brand-accent ring-offset-brand-bg' 
+                            : ''
+                        }`}>
+                          <span 
+                            className={`h-10 w-10 rounded-full border border-white/20`} 
+                            style={{ backgroundColor: getCssColorValue(color) }}
+                          ></span>
+                        </div>
+                        <span className={`text-xs font-medium text-center ${
+                          isSelected 
+                            ? 'text-brand-primary font-semibold' 
+                            : 'text-brand-secondary'
+                        }`}>
+                          {getColorName(color)}
+                        </span>
                       </button>
                     );
                   })}
@@ -336,5 +401,6 @@ export const ProductDetailPage: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };

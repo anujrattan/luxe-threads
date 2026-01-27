@@ -27,6 +27,7 @@ import {
   Heart,
   Recycle,
   ArrowRight,
+  ArrowLeft,
   Target,
   Droplet,
   CloudUpload,
@@ -59,6 +60,7 @@ import {
   Plus,
   Minus,
   ChevronDown,
+  ChevronUp,
   Clock,
   Globe,
   Package,
@@ -83,6 +85,7 @@ export const UserIcon = User;
 export const HeartIcon = Heart;
 export const RecycleIcon = Recycle;
 export const ArrowRightIcon = ArrowRight;
+export const ArrowLeftIcon = ArrowLeft;
 export const TargetIcon = Target;
 export const DropletIcon = Droplet;
 export const UploadCloudIcon = CloudUpload;
@@ -115,6 +118,7 @@ export const TrashIcon = Trash2;
 export const PlusIcon = Plus;
 export const MinusIcon = Minus;
 export const ChevronDownIcon = ChevronDown;
+export const ChevronUpIcon = ChevronUp;
 export const ClockIcon = Clock;
 export const GlobeIcon = Globe;
 export const PackageIcon = Package;

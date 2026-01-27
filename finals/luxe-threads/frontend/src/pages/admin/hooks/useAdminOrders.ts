@@ -8,10 +8,7 @@ export const useAdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [orderProducts, setOrderProducts] = useState<Record<string, any>>({});
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [updatingFulfillmentPartner, setUpdatingFulfillmentPartner] = useState(false);
-  const [updatingPartnerOrderId, setUpdatingPartnerOrderId] = useState(false);
-  const [partnerOrderIdInput, setPartnerOrderIdInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchOrders = async () => {
     setOrdersLoading(true);
@@ -51,14 +48,6 @@ export const useAdminOrders = () => {
     }
   }, [selectedOrder]);
 
-  // Initialize partner order ID input when order is selected
-  useEffect(() => {
-    if (selectedOrder) {
-      setPartnerOrderIdInput(selectedOrder.partner_order_id || '');
-    } else {
-      setPartnerOrderIdInput('');
-    }
-  }, [selectedOrder]);
 
   const selectOrder = (order: any) => {
     setSelectedOrder(order);
@@ -68,100 +57,171 @@ export const useAdminOrders = () => {
     setSelectedOrder(null);
   };
 
-  const updateOrderStatus = async (orderNumber: string, status: string): Promise<void> => {
-    try {
-      setUpdatingStatus(true);
-      const response = await api.updateOrderStatus(orderNumber, status);
-      if (response.success) {
-        // Update the selected order status
-        if (selectedOrder && selectedOrder.order_number === orderNumber) {
-          setSelectedOrder({
-            ...selectedOrder,
-            status: status,
-          });
-        }
-        // Refresh orders list to update status badge
-        await fetchOrders();
-        showToast(`Order status updated to ${status.charAt(0).toUpperCase() + status.slice(1)}`, 'success');
-      } else {
-        showToast(response.message || 'Failed to update order status', 'error');
-      }
-    } catch (error: any) {
-      console.error('Error updating order status:', error);
-      showToast(error.message || 'Failed to update order status', 'error');
-    } finally {
-      setUpdatingStatus(false);
+  /**
+   * Save all order changes in grouped updates
+   * Group 1: Status + Tracking Info (shipped together)
+   * Group 2: Fulfillment Partner + Partner Order ID (shipped together)
+   */
+  const saveOrderChanges = async (
+    orderNumber: string,
+    changes: {
+      // Group 1: Status & Tracking
+      status?: string;
+      shipping_partner?: string | null;
+      tracking_number?: string | null;
+      tracking_url?: string | null;
+      // Group 2: Fulfillment Partner & Partner Order ID
+      fulfillment_partner?: string | null;
+      partner_order_id?: string | null;
     }
-  };
-
-  const updateFulfillmentPartner = async (orderNumber: string, partner: string | null): Promise<void> => {
+  ): Promise<{ success: boolean; message?: string }> => {
     try {
-      setUpdatingFulfillmentPartner(true);
-      const response = await api.updateOrderFulfillmentPartner(orderNumber, partner);
-      if (response.success) {
-        // Update the selected order fulfillment partner
+      setIsSaving(true);
+      const updates: Promise<any>[] = [];
+      const errors: string[] = [];
+
+      // Group 1: Update Status + Tracking Info (if status changed or tracking info changed)
+      const statusChanged = changes.status !== undefined && 
+        changes.status !== selectedOrder?.status;
+      const trackingChanged = 
+        changes.shipping_partner !== undefined ||
+        changes.tracking_number !== undefined ||
+        changes.tracking_url !== undefined;
+
+      if (statusChanged || trackingChanged) {
+        const newStatus = changes.status !== undefined 
+          ? changes.status 
+          : selectedOrder?.status || 'pending';
+        
+        // Validate: If status is "shipped", require at least one tracking field
+        if (newStatus === 'shipped') {
+          // Get final tracking values (new or existing)
+          const finalShippingPartner = changes.shipping_partner !== undefined 
+            ? changes.shipping_partner 
+            : selectedOrder?.shipping_partner || null;
+          const finalTrackingNumber = changes.tracking_number !== undefined 
+            ? changes.tracking_number 
+            : selectedOrder?.tracking_number || null;
+          const finalTrackingUrl = changes.tracking_url !== undefined 
+            ? changes.tracking_url 
+            : selectedOrder?.tracking_url || null;
+
+          const hasTrackingInfo = 
+            finalShippingPartner ||
+            finalTrackingNumber ||
+            finalTrackingUrl;
+
+          if (!hasTrackingInfo) {
+            return {
+              success: false,
+              message: 'At least one tracking field (Shipping Partner, Tracking Number, or Tracking URL) is required when status is "shipped"',
+            };
+          }
+
+          // Prepare tracking info for "shipped" status
+          const trackingInfo = {
+            shipping_partner: finalShippingPartner,
+            tracking_number: finalTrackingNumber,
+            tracking_url: finalTrackingUrl,
+          };
+
+          updates.push(
+            api.updateOrderStatus(orderNumber, newStatus, undefined, trackingInfo)
+              .catch((error: any) => {
+                errors.push(`Failed to update status: ${error.message || 'Unknown error'}`);
+                throw error;
+              })
+          );
+        } else {
+          // Status changed but not to "shipped" - just update status
+          if (statusChanged) {
+            updates.push(
+              api.updateOrderStatus(orderNumber, newStatus, undefined, undefined)
+                .catch((error: any) => {
+                  errors.push(`Failed to update status: ${error.message || 'Unknown error'}`);
+                  throw error;
+                })
+            );
+          }
+        }
+      }
+
+      // Group 2: Update Fulfillment Partner + Partner Order ID (if either changed)
+      const fulfillmentPartnerChanged = changes.fulfillment_partner !== undefined &&
+        changes.fulfillment_partner !== selectedOrder?.fulfillment_partner;
+      const partnerOrderIdChanged = changes.partner_order_id !== undefined &&
+        changes.partner_order_id !== selectedOrder?.partner_order_id;
+
+      if (fulfillmentPartnerChanged || partnerOrderIdChanged) {
+        // Update fulfillment partner if changed
+        if (fulfillmentPartnerChanged) {
+          updates.push(
+            api.updateOrderFulfillmentPartner(orderNumber, changes.fulfillment_partner || null)
+              .catch((error: any) => {
+                errors.push(`Failed to update fulfillment partner: ${error.message || 'Unknown error'}`);
+                throw error;
+              })
+          );
+        }
+
+        // Update partner order ID if changed
+        if (partnerOrderIdChanged) {
+          updates.push(
+            api.updateOrderPartnerOrderId(orderNumber, changes.partner_order_id || null)
+              .catch((error: any) => {
+                errors.push(`Failed to update partner order ID: ${error.message || 'Unknown error'}`);
+                throw error;
+              })
+          );
+        }
+      }
+
+      // Execute all updates
+      if (updates.length > 0) {
+        const results = await Promise.allSettled(updates);
+        
+        // Check if any failed
+        const failed = results.some(result => result.status === 'rejected');
+        
+        if (failed) {
+          const errorMessages = results
+            .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+            .map(r => r.reason?.message || 'Unknown error');
+          
+          return {
+            success: false,
+            message: `Some updates failed: ${errorMessages.join(', ')}`,
+          };
+        }
+
+        // All updates succeeded - refresh orders and update selected order
+        await fetchOrders();
+        
+        // Update selected order with new values
         if (selectedOrder && selectedOrder.order_number === orderNumber) {
           setSelectedOrder({
             ...selectedOrder,
-            fulfillment_partner: partner,
+            ...(changes.status !== undefined && { status: changes.status }),
+            ...(changes.shipping_partner !== undefined && { shipping_partner: changes.shipping_partner }),
+            ...(changes.tracking_number !== undefined && { tracking_number: changes.tracking_number }),
+            ...(changes.tracking_url !== undefined && { tracking_url: changes.tracking_url }),
+            ...(changes.fulfillment_partner !== undefined && { fulfillment_partner: changes.fulfillment_partner }),
+            ...(changes.partner_order_id !== undefined && { partner_order_id: changes.partner_order_id }),
           });
         }
-        // Refresh orders list
-        await fetchOrders();
-        showToast(
-          partner 
-            ? `Fulfillment partner set to ${partner}` 
-            : 'Fulfillment partner removed',
-          'success'
-        );
-      } else {
-        showToast(response.message || 'Failed to update fulfillment partner', 'error');
-      }
-    } catch (error: any) {
-      console.error('Error updating fulfillment partner:', error);
-      showToast(error.message || 'Failed to update fulfillment partner', 'error');
-    } finally {
-      setUpdatingFulfillmentPartner(false);
-    }
-  };
 
-  const updatePartnerOrderId = async (orderNumber: string, orderId: string | null): Promise<void> => {
-    try {
-      setUpdatingPartnerOrderId(true);
-      const response = await api.updateOrderPartnerOrderId(orderNumber, orderId);
-      if (response.success) {
-        // Update the selected order partner order ID
-        if (selectedOrder && selectedOrder.order_number === orderNumber) {
-          setSelectedOrder({
-            ...selectedOrder,
-            partner_order_id: orderId,
-          });
-        }
-        // Refresh orders list
-        await fetchOrders();
-        const partnerName = selectedOrder?.fulfillment_partner || 'Partner';
-        showToast(
-          orderId 
-            ? `${partnerName} order ID saved successfully` 
-            : 'Partner order ID cleared',
-          'success'
-        );
+        showToast('Order updated successfully', 'success');
+        return { success: true };
       } else {
-        showToast(response.message || 'Failed to update partner order ID', 'error');
-        // Reset input to current value on error
-        if (selectedOrder && selectedOrder.order_number === orderNumber) {
-          setPartnerOrderIdInput(selectedOrder.partner_order_id || '');
-        }
+        // No changes to save
+        return { success: false, message: 'No changes to save' };
       }
     } catch (error: any) {
-      console.error('Error updating partner order ID:', error);
-      showToast(error.message || 'Failed to update partner order ID', 'error');
-      // Reset input to current value on error
-      if (selectedOrder && selectedOrder.order_number === orderNumber) {
-        setPartnerOrderIdInput(selectedOrder.partner_order_id || '');
-      }
+      console.error('Error saving order changes:', error);
+      showToast(error.message || 'Failed to save order changes', 'error');
+      return { success: false, message: error.message || 'Failed to save order changes' };
     } finally {
-      setUpdatingPartnerOrderId(false);
+      setIsSaving(false);
     }
   };
 
@@ -170,17 +230,11 @@ export const useAdminOrders = () => {
     selectedOrder,
     orderProducts,
     ordersLoading,
-    updatingStatus,
-    updatingFulfillmentPartner,
-    updatingPartnerOrderId,
-    partnerOrderIdInput,
+    isSaving,
     fetchOrders,
     selectOrder,
     clearSelection,
-    updateOrderStatus,
-    updateFulfillmentPartner,
-    updatePartnerOrderId,
-    setPartnerOrderIdInput,
+    saveOrderChanges,
   };
 };
 

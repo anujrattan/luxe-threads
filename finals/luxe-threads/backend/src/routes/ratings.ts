@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { authenticateToken, AuthRequest } from "../middleware/auth.js";
+import { authenticateToken, optionalAuth, AuthRequest } from "../middleware/auth.js";
 import { supabaseAdmin } from "../services/supabase.js";
 import { cache } from "../services/redis.js";
 
@@ -23,11 +23,12 @@ async function invalidateRatingsCache(productId: string): Promise<void> {
 /**
  * POST /api/ratings
  * Submit or update a rating for a product
+ * Supports both authenticated users and guest users (via email verification)
  */
-router.post("/", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.post("/", optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authReq = req as AuthRequest;
-    const { product_id, order_id, rating } = req.body;
+    const { product_id, order_id, rating, email } = req.body;
 
     // Validate input
     if (!product_id || !order_id || !rating) {
@@ -44,38 +45,74 @@ router.post("/", authenticateToken, async (req: Request, res: Response, next: Ne
       });
     }
 
-    // Get user record
-    const { data: user, error: userError } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", authReq.userId)
-      .single();
+    let userId: string | null = null;
 
-    if (userError || !user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+    // Handle authenticated users
+    if (authReq.userId) {
+      // Get user record for authenticated user
+      const { data: user, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", authReq.userId)
+        .single();
+
+      if (userError || !user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      userId = user.id;
+    } else {
+      // Guest user - email is required
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is required for guest users",
+        });
+      }
     }
 
-    // Verify order belongs to user and contains the product
+    // Get order to verify ownership and get user_id
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .select(`
         id,
         user_id,
+        user_email,
         status,
         order_items!inner(product_id)
       `)
       .eq("id", order_id)
-      .eq("user_id", user.id)
       .single();
 
     if (orderError || !order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found or does not belong to you",
+        message: "Order not found",
       });
+    }
+
+    // Verify order ownership
+    if (authReq.userId) {
+      // Authenticated user - verify order belongs to them
+      if (order.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: "Order does not belong to you",
+        });
+      }
+    } else {
+      // Guest user - verify email matches order
+      if (order.user_email.toLowerCase() !== email.toLowerCase()) {
+        return res.status(403).json({
+          success: false,
+          message: "Email does not match the order",
+        });
+      }
+      // Use the order's user_id (guest user record)
+      userId = order.user_id;
     }
 
     // Check if order is delivered
@@ -101,7 +138,7 @@ router.post("/", authenticateToken, async (req: Request, res: Response, next: Ne
     const { data: existingRating } = await supabaseAdmin
       .from("product_ratings")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("product_id", product_id)
       .eq("order_id", order_id)
       .single();
@@ -124,7 +161,7 @@ router.post("/", authenticateToken, async (req: Request, res: Response, next: Ne
       const { data, error } = await supabaseAdmin
         .from("product_ratings")
         .insert({
-          user_id: user.id,
+          user_id: userId,
           product_id,
           order_id,
           rating,
@@ -219,32 +256,48 @@ router.get("/product/:productId", async (req: Request, res: Response, next: Next
 /**
  * GET /api/ratings/order/:orderNumber
  * Get user's ratings for products in an order
+ * Supports both authenticated users and guest users (via email query param)
  */
-router.get("/order/:orderNumber", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.get("/order/:orderNumber", optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authReq = req as AuthRequest;
     const { orderNumber } = req.params;
+    const { email } = req.query; // For guest users
 
-    // Get user record
-    const { data: user, error: userError } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", authReq.userId)
-      .single();
+    let userId: string | null = null;
 
-    if (userError || !user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+    // Handle authenticated users
+    if (authReq.userId) {
+      // Get user record for authenticated user
+      const { data: user, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", authReq.userId)
+        .single();
+
+      if (userError || !user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      userId = user.id;
+    } else {
+      // Guest user - email is required
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is required for guest users",
+        });
+      }
     }
 
     // Get order
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id")
+      .select("id, user_id, user_email")
       .eq("order_number", orderNumber)
-      .eq("user_id", user.id)
       .single();
 
     if (orderError || !order) {
@@ -254,12 +307,33 @@ router.get("/order/:orderNumber", authenticateToken, async (req: Request, res: R
       });
     }
 
+    // Verify order ownership
+    if (authReq.userId) {
+      // Authenticated user - verify order belongs to them
+      if (order.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: "Order does not belong to you",
+        });
+      }
+    } else {
+      // Guest user - verify email matches order
+      if (order.user_email.toLowerCase() !== (email as string).toLowerCase()) {
+        return res.status(403).json({
+          success: false,
+          message: "Email does not match the order",
+        });
+      }
+      // Use the order's user_id (guest user record)
+      userId = order.user_id;
+    }
+
     // Get ratings for this order
     const { data: ratings, error: ratingsError } = await supabaseAdmin
       .from("product_ratings")
       .select("*")
       .eq("order_id", order.id)
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (ratingsError) throw ratingsError;
 
@@ -275,25 +349,43 @@ router.get("/order/:orderNumber", authenticateToken, async (req: Request, res: R
 /**
  * GET /api/ratings/can-rate/:productId/:orderNumber
  * Check if user can rate a specific product from an order
+ * Supports both authenticated users and guest users (via email query param)
  */
-router.get("/can-rate/:productId/:orderNumber", authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.get("/can-rate/:productId/:orderNumber", optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authReq = req as AuthRequest;
     const { productId, orderNumber } = req.params;
+    const { email } = req.query; // For guest users
 
-    // Get user record
-    const { data: user, error: userError } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", authReq.userId)
-      .single();
+    let userId: string | null = null;
 
-    if (userError || !user) {
-      return res.json({
-        success: true,
-        canRate: false,
-        reason: "User not found",
-      });
+    // Handle authenticated users
+    if (authReq.userId) {
+      // Get user record for authenticated user
+      const { data: user, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", authReq.userId)
+        .single();
+
+      if (userError || !user) {
+        return res.json({
+          success: true,
+          canRate: false,
+          reason: "User not found",
+        });
+      }
+
+      userId = user.id;
+    } else {
+      // Guest user - email is required
+      if (!email) {
+        return res.json({
+          success: true,
+          canRate: false,
+          reason: "Email is required for guest users",
+        });
+      }
     }
 
     // Get order
@@ -301,11 +393,12 @@ router.get("/can-rate/:productId/:orderNumber", authenticateToken, async (req: R
       .from("orders")
       .select(`
         id,
+        user_id,
+        user_email,
         status,
         order_items!inner(product_id)
       `)
       .eq("order_number", orderNumber)
-      .eq("user_id", user.id)
       .single();
 
     if (orderError || !order) {
@@ -314,6 +407,29 @@ router.get("/can-rate/:productId/:orderNumber", authenticateToken, async (req: R
         canRate: false,
         reason: "Order not found",
       });
+    }
+
+    // Verify order ownership
+    if (authReq.userId) {
+      // Authenticated user - verify order belongs to them
+      if (order.user_id !== userId) {
+        return res.json({
+          success: true,
+          canRate: false,
+          reason: "Order does not belong to you",
+        });
+      }
+    } else {
+      // Guest user - verify email matches order
+      if (order.user_email.toLowerCase() !== (email as string).toLowerCase()) {
+        return res.json({
+          success: true,
+          canRate: false,
+          reason: "Email does not match the order",
+        });
+      }
+      // Use the order's user_id (guest user record)
+      userId = order.user_id;
     }
 
     // Check if delivered
@@ -341,7 +457,7 @@ router.get("/can-rate/:productId/:orderNumber", authenticateToken, async (req: R
     const { data: existingRating } = await supabaseAdmin
       .from("product_ratings")
       .select("rating")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("product_id", productId)
       .eq("order_id", order.id)
       .single();

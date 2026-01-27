@@ -139,8 +139,8 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
 
   return (
     <>
-      <header className={`${isHomePage ? 'absolute' : 'sticky'} top-0 left-0 right-0 z-50 w-full max-w-full px-4 sm:px-6 pt-2 overflow-x-hidden ${isHomePage ? 'bg-gradient-to-b from-black/50 to-transparent backdrop-blur-sm' : 'bg-transparent'}`}>
-        <div className="mx-auto max-w-screen-xl w-full flex items-center justify-between gap-2">
+      <header className={`${isHomePage ? 'absolute' : 'sticky'} top-0 left-0 right-0 z-[100] w-full max-w-full px-4 sm:px-6 pt-2 overflow-visible ${isHomePage ? 'bg-gradient-to-b from-black/50 to-transparent backdrop-blur-sm' : 'bg-transparent'}`}>
+        <div className="mx-auto max-w-screen-xl w-full flex items-center justify-between gap-2 overflow-visible">
         {/* Logo - Always Left */}
         <Link 
           to="/"
@@ -156,7 +156,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
         </Link>
 
         {/* Navigation Container - Center */}
-        <nav className="hidden md:flex items-center gap-1 w-fit mx-auto rounded-full bg-brand-surface px-4 md:px-6 py-2 backdrop-blur-lg border border-white/10 shadow-lg flex-shrink">
+        <nav className="hidden md:flex items-center gap-1 w-fit mx-auto rounded-full bg-brand-surface px-4 md:px-6 py-2 backdrop-blur-lg border border-white/10 shadow-lg flex-shrink overflow-visible">
           {navItems.map(item => (
             <Link 
               key={item.name}
@@ -173,8 +173,8 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
           ))}
           
           {/* Shop Dropdown */}
-          <div 
-            className="relative"
+          <div
+            className="relative z-[100]"
             onMouseEnter={() => setShopDropdownOpen(true)}
             onMouseLeave={() => setShopDropdownOpen(false)}
           >
@@ -199,7 +199,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, currentPage, cart
 
             {/* Dropdown Menu */}
             {shopDropdownOpen && (
-              <div className="absolute top-full left-0 -mt-1 pt-3 w-56 z-50">
+              <div className="absolute top-full left-0 -mt-1 pt-3 w-56 z-[100]">
                 <div className="bg-brand-surface rounded-xl border border-white/10 shadow-xl overflow-hidden">
                   <div className="py-2">
                     <Link

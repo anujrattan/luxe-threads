@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { HelpCircleIcon, ChevronDownIcon } from '../components/icons';
 import { formatCurrency } from '../utils/currency';
 import { useApp } from '../context/AppContext';
+import { SEOHead } from '../components/SEOHead';
+import { StructuredData, createFAQSchema } from '../components/StructuredData';
+import { DEFAULT_SITE_URL } from '../utils/seo';
 
 export const FAQPage: React.FC = () => {
   const { currency } = useApp();
@@ -42,8 +45,20 @@ export const FAQPage: React.FC = () => {
     }
   ];
 
+  // SEO Data
+  const seoData = {
+    title: 'Frequently Asked Questions - Luxe Threads',
+    description: 'Find answers to common questions about shipping, returns, sizing, payment methods, and more at Luxe Threads. Get help with your orders and product inquiries.',
+    keywords: 'FAQ, frequently asked questions, shipping, returns, sizing, payment, Luxe Threads help, customer support',
+    type: 'website' as const,
+    url: `${DEFAULT_SITE_URL}/faq`,
+  };
+
   return (
-    <div className="animate-fadeIn pb-16">
+    <>
+      <SEOHead {...seoData} />
+      <StructuredData data={createFAQSchema(faqs)} />
+      <div className="animate-fadeIn pb-16">
       {/* Hero Section */}
       <section className="relative bg-brand-surface/30 py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -98,16 +113,17 @@ export const FAQPage: React.FC = () => {
             <p className="text-brand-secondary mb-4">
               Can't find what you're looking for? Our support team is here to help.
             </p>
-            <button
-              onClick={() => setPage({ name: 'contact' })}
+            <a
+              href="/contact"
               className="inline-flex items-center gap-2 px-6 py-3 bg-brand-accent hover:bg-brand-accent-hover text-white rounded-lg font-semibold transition-colors"
             >
               Contact Support
-            </button>
+            </a>
           </div>
         </div>
       </section>
     </div>
+    </>
   );
 };
 

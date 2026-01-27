@@ -159,5 +159,8 @@ export const cacheKeys = {
   products: 'products:all',
   productsByCategory: (categorySlug: string) => `products:category:${categorySlug}`,
   product: (id: string) => `product:${id}`,
+  categories: 'categories:all',
+  categoriesActive: 'categories:active',
+  category: (slug: string) => `category:${slug}`,
 };
 

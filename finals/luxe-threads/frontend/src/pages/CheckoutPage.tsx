@@ -140,13 +140,7 @@ const CheckoutForm: React.FC<{
   
   const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isAddressSaved) {
-      // If address not saved yet, save it first
-      handleSaveAddress(e);
-      return;
-    }
-    
+        
     // Format phone number for backend
     const formattedPhone = formatPhoneForBackend(formData.phone, formData.countryCode);
     
@@ -158,7 +152,10 @@ const CheckoutForm: React.FC<{
   };
 
   return (
-    <form onSubmit={isAddressSaved ? handlePlaceOrder : handleSaveAddress} className="space-y-6">
+    <form
+      onSubmit={(!isAddressSaved || isEditing) ? handleSaveAddress : handlePlaceOrder}
+      className="space-y-6"
+    >
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-brand-primary">Contact Information</h2>

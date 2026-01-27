@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Select } from '../../../components/ui';
 import { XIcon } from '../../../components/icons';
 import { formatCurrency } from '../../../utils/currency';
@@ -8,14 +8,18 @@ interface OrderDetailViewProps {
   orderProducts: Record<string, any>;
   currency: string;
   onClose: () => void;
-  onStatusUpdate: (orderNumber: string, status: string) => Promise<void>;
-  onFulfillmentPartnerUpdate: (orderNumber: string, partner: string | null) => Promise<void>;
-  onPartnerOrderIdUpdate: (orderNumber: string, orderId: string | null) => Promise<void>;
-  updatingStatus: boolean;
-  updatingFulfillmentPartner: boolean;
-  updatingPartnerOrderId: boolean;
-  partnerOrderIdInput: string;
-  onPartnerOrderIdInputChange: (value: string) => void;
+  onSave: (
+    orderNumber: string,
+    changes: {
+      status?: string;
+      shipping_partner?: string | null;
+      tracking_number?: string | null;
+      tracking_url?: string | null;
+      fulfillment_partner?: string | null;
+      partner_order_id?: string | null;
+    }
+  ) => Promise<{ success: boolean; message?: string }>;
+  isSaving: boolean;
 }
 
 export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
@@ -23,38 +27,188 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   orderProducts,
   currency,
   onClose,
-  onStatusUpdate,
-  onFulfillmentPartnerUpdate,
-  onPartnerOrderIdUpdate,
-  updatingStatus,
-  updatingFulfillmentPartner,
-  updatingPartnerOrderId,
-  partnerOrderIdInput,
-  onPartnerOrderIdInputChange,
+  onSave,
+  isSaving,
 }) => {
-  const handleStatusChange = async (newStatus: string) => {
-    await onStatusUpdate(order.order_number, newStatus);
+  // Original values (from server) - used to detect changes and for cancel
+  const [originalValues, setOriginalValues] = useState({
+    status: order.status || 'pending',
+    shipping_partner: order.shipping_partner || null,
+    tracking_number: order.tracking_number || null,
+    tracking_url: order.tracking_url || null,
+    fulfillment_partner: order.fulfillment_partner || null,
+    partner_order_id: order.partner_order_id || null,
+  });
+
+  // Current values (user edits) - local state
+  const [currentValues, setCurrentValues] = useState(originalValues);
+
+  // Update both original and current when order changes (e.g., after save)
+  useEffect(() => {
+    const newOriginal = {
+      status: order.status || 'pending',
+      shipping_partner: order.shipping_partner || null,
+      tracking_number: order.tracking_number || null,
+      tracking_url: order.tracking_url || null,
+      fulfillment_partner: order.fulfillment_partner || null,
+      partner_order_id: order.partner_order_id || null,
+    };
+    setOriginalValues(newOriginal);
+    setCurrentValues(newOriginal);
+  }, [order]);
+
+  // Detect unsaved changes
+  const hasUnsavedChanges = JSON.stringify(originalValues) !== JSON.stringify(currentValues);
+
+  // Show tracking fields when status is "shipped" or "delivered" (current or original)
+  const showTrackingFields = 
+    currentValues.status === 'shipped' || 
+    currentValues.status === 'delivered' ||
+    originalValues.status === 'shipped' ||
+    originalValues.status === 'delivered';
+
+  // Handle status change (local state only)
+  const handleStatusChange = (newStatus: string) => {
+    setCurrentValues({
+      ...currentValues,
+      status: newStatus,
+    });
   };
 
-  const handleFulfillmentPartnerChange = async (newPartner: string) => {
+  // Handle tracking field changes (local state only)
+  const handleShippingPartnerChange = (value: string) => {
+    setCurrentValues({
+      ...currentValues,
+      shipping_partner: value || null,
+    });
+  };
+
+  const handleTrackingNumberChange = (value: string) => {
+    setCurrentValues({
+      ...currentValues,
+      tracking_number: value || null,
+    });
+  };
+
+  const handleTrackingUrlChange = (value: string) => {
+    setCurrentValues({
+      ...currentValues,
+      tracking_url: value || null,
+    });
+  };
+
+  // Handle fulfillment partner change (local state only)
+  const handleFulfillmentPartnerChange = (newPartner: string) => {
     const partnerValue = newPartner === '' ? null : newPartner;
-    await onFulfillmentPartnerUpdate(order.order_number, partnerValue);
+    setCurrentValues({
+      ...currentValues,
+      fulfillment_partner: partnerValue,
+      // Clear partner order ID if fulfillment partner is removed
+      ...(partnerValue === null && { partner_order_id: null }),
+    });
   };
 
-  const handlePartnerOrderIdBlur = async () => {
-    const orderIdValue = partnerOrderIdInput.trim() || null;
-    if (orderIdValue !== (order.partner_order_id || null)) {
-      await onPartnerOrderIdUpdate(order.order_number, orderIdValue);
+  // Handle partner order ID change (local state only)
+  const handlePartnerOrderIdChange = (value: string) => {
+    setCurrentValues({
+      ...currentValues,
+      partner_order_id: value.trim() || null,
+    });
+  };
+
+  // Cancel - revert to original values
+  const handleCancel = () => {
+    setCurrentValues(originalValues);
+  };
+
+  // Save - calculate changes and call onSave
+  const handleSave = async () => {
+    // Calculate what actually changed
+    const changes: any = {};
+
+    const statusChanged = currentValues.status !== originalValues.status;
+    const trackingChanged = 
+      currentValues.shipping_partner !== originalValues.shipping_partner ||
+      currentValues.tracking_number !== originalValues.tracking_number ||
+      currentValues.tracking_url !== originalValues.tracking_url;
+
+    // Group 1: Status + Tracking Info
+    if (statusChanged) {
+      changes.status = currentValues.status;
+      
+      // If status changed to "shipped" or "delivered", include tracking info (even if unchanged)
+      if (currentValues.status === 'shipped' || currentValues.status === 'delivered') {
+        changes.shipping_partner = currentValues.shipping_partner;
+        changes.tracking_number = currentValues.tracking_number;
+        changes.tracking_url = currentValues.tracking_url;
+      }
+    } else if (trackingChanged) {
+      // Tracking info changed - include it if status is "shipped" or "delivered"
+      // Always include the current status so backend knows which status to update tracking for
+      if (currentValues.status === 'shipped' || currentValues.status === 'delivered' ||
+          originalValues.status === 'shipped' || originalValues.status === 'delivered') {
+        // Include status to ensure backend processes the update
+        changes.status = currentValues.status;
+        changes.shipping_partner = currentValues.shipping_partner;
+        changes.tracking_number = currentValues.tracking_number;
+        changes.tracking_url = currentValues.tracking_url;
+      }
     }
+
+    // Group 2: Fulfillment Partner + Partner Order ID
+    if (currentValues.fulfillment_partner !== originalValues.fulfillment_partner) {
+      changes.fulfillment_partner = currentValues.fulfillment_partner;
+    }
+
+    if (currentValues.partner_order_id !== originalValues.partner_order_id) {
+      changes.partner_order_id = currentValues.partner_order_id;
+    }
+
+    // If no changes, don't save
+    if (Object.keys(changes).length === 0) {
+      return;
+    }
+
+    // Call save function
+    const result = await onSave(order.order_number, changes);
+    
+    if (!result.success && result.message) {
+      // Error message will be shown by the hook's toast
+    }
+    // If successful, original values will be updated via useEffect when order prop updates
   };
 
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-2xl font-bold text-brand-primary">Order Details</h3>
-        <Button onClick={onClose} variant="ghost">
-          <XIcon className="w-5 h-5" />
-        </Button>
+        <div className="flex items-center gap-3">
+          <h3 className="text-2xl font-bold text-brand-primary">Order Details</h3>
+          {hasUnsavedChanges && (
+            <span className="text-xs text-yellow-500 font-medium">• Unsaved changes</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {hasUnsavedChanges && (
+            <Button 
+              onClick={handleCancel} 
+              variant="outline"
+              disabled={isSaving}
+              className="text-sm"
+            >
+              Cancel
+            </Button>
+          )}
+          <Button 
+            onClick={handleSave} 
+            disabled={!hasUnsavedChanges || isSaving}
+            className="text-sm"
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+          <Button onClick={onClose} variant="ghost" disabled={isSaving}>
+            <XIcon className="w-5 h-5" />
+          </Button>
+        </div>
       </div>
       
       <div className="space-y-6">
@@ -76,11 +230,63 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                 { value: 'cancelled', label: 'Cancelled' },
                 { value: 'failed', label: 'Failed' },
               ]}
-              value={order.status || 'pending'}
+              value={currentValues.status}
               onChange={handleStatusChange}
-              disabled={updatingStatus}
+              disabled={isSaving}
               className="min-w-[180px]"
             />
+            {/* Tracking Information - Show when status is "shipped" or "delivered" */}
+            {showTrackingFields && (
+              <div className="mt-4 p-4 bg-brand-bg/50 rounded-lg border border-white/10 space-y-3">
+                <p className="text-sm font-medium text-brand-primary mb-3">Shipping Information</p>
+                
+                <div>
+                  <label className="block text-xs text-brand-secondary mb-1">
+                    Shipping Partner
+                  </label>
+                  <Input
+                    type="text"
+                    value={currentValues.shipping_partner || ''}
+                    onChange={(e) => handleShippingPartnerChange(e.target.value)}
+                    placeholder="e.g., FedEx, DHL, BlueDart, Delhivery"
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-brand-secondary mb-1">
+                    Tracking Number
+                  </label>
+                  <Input
+                    type="text"
+                    value={currentValues.tracking_number || ''}
+                    onChange={(e) => handleTrackingNumberChange(e.target.value)}
+                    placeholder="Enter tracking number"
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-brand-secondary mb-1">
+                    Tracking URL
+                  </label>
+                  <Input
+                    type="url"
+                    value={currentValues.tracking_url || ''}
+                    onChange={(e) => handleTrackingUrlChange(e.target.value)}
+                    placeholder="https://tracking.example.com/..."
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                </div>
+
+                <p className="text-xs text-brand-secondary mt-2">
+                  * At least one field (Shipping Partner, Tracking Number, or Tracking URL) is required when status is "Shipped"
+                </p>
+              </div>
+            )}
           </div>
           <div>
             <p className="text-sm text-brand-secondary mb-1">Payment Status</p>
@@ -100,33 +306,25 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                 { value: 'Qikink', label: 'Qikink' },
                 { value: 'Printrove', label: 'Printrove' },
               ]}
-              value={order.fulfillment_partner || ''}
+              value={currentValues.fulfillment_partner || ''}
               onChange={handleFulfillmentPartnerChange}
-              disabled={updatingFulfillmentPartner}
+              disabled={isSaving}
               className="min-w-[180px]"
             />
             {/* Partner Order ID Input - shown when fulfillment partner is selected */}
-            {order.fulfillment_partner && (
+            {currentValues.fulfillment_partner && (
               <div className="mt-3">
                 <p className="text-sm text-brand-secondary mb-2">
-                  {order.fulfillment_partner} Order ID
+                  {currentValues.fulfillment_partner} Order ID
                 </p>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={partnerOrderIdInput}
-                    onChange={(e) => onPartnerOrderIdInputChange(e.target.value)}
-                    onBlur={handlePartnerOrderIdBlur}
-                    placeholder={`Enter ${order.fulfillment_partner} order ID`}
-                    disabled={updatingPartnerOrderId}
-                    className="w-full"
-                  />
-                  {updatingPartnerOrderId && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-brand-secondary">
-                      Saving...
-                    </span>
-                  )}
-                </div>
+                <Input
+                  type="text"
+                  value={currentValues.partner_order_id || ''}
+                  onChange={(e) => handlePartnerOrderIdChange(e.target.value)}
+                  placeholder={`Enter ${currentValues.fulfillment_partner} order ID`}
+                  disabled={isSaving}
+                  className="w-full"
+                />
               </div>
             )}
           </div>

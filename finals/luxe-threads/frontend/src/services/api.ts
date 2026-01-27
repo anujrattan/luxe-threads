@@ -426,10 +426,27 @@ const api = {
         });
       },
 
-      updateOrderStatus: async (orderNumber: string, status: string, notes?: string): Promise<any> => {
+      updateOrderStatus: async (
+        orderNumber: string, 
+        status: string, 
+        notes?: string,
+        trackingInfo?: {
+          shipping_partner?: string | null;
+          tracking_number?: string | null;
+          tracking_url?: string | null;
+        }
+      ): Promise<any> => {
         return apiCall(`/orders/${orderNumber}/status`, {
           method: 'PUT',
-          body: JSON.stringify({ status, notes }),
+          body: JSON.stringify({ 
+            status, 
+            notes,
+            ...(trackingInfo && {
+              shipping_partner: trackingInfo.shipping_partner,
+              tracking_number: trackingInfo.tracking_number,
+              tracking_url: trackingInfo.tracking_url,
+            }),
+          }),
         });
       },
 
@@ -514,7 +531,7 @@ const api = {
       },
 
       // Ratings
-      submitRating: async (ratingData: { product_id: string; order_id: string; rating: number }): Promise<any> => {
+      submitRating: async (ratingData: { product_id: string; order_id: string; rating: number; email?: string }): Promise<any> => {
         return apiCall('/ratings', {
           method: 'POST',
           body: JSON.stringify(ratingData),
@@ -525,19 +542,18 @@ const api = {
         return apiCall(`/ratings/product/${productId}`);
       },
 
-      getOrderRatings: async (orderNumber: string): Promise<any> => {
-        return apiCall(`/ratings/order/${orderNumber}`);
+      getOrderRatings: async (orderNumber: string, email?: string): Promise<any> => {
+        const params = new URLSearchParams();
+        if (email) params.append('email', email);
+        const queryString = params.toString();
+        return apiCall(`/ratings/order/${orderNumber}${queryString ? `?${queryString}` : ''}`);
       },
 
-      canRateProduct: async (productId: string, orderNumber: string): Promise<any> => {
-        return apiCall(`/ratings/can-rate/${productId}/${orderNumber}`);
-      },
-
-      getOrderByNumber: async (orderNumber: string): Promise<any> => {
-        return apiCall(`/orders/lookup`, {
-          method: 'POST',
-          body: JSON.stringify({ orderNumber }),
-        });
+      canRateProduct: async (productId: string, orderNumber: string, email?: string): Promise<any> => {
+        const params = new URLSearchParams();
+        if (email) params.append('email', email);
+        const queryString = params.toString();
+        return apiCall(`/ratings/can-rate/${productId}/${orderNumber}${queryString ? `?${queryString}` : ''}`);
       },
 
       // Analytics (admin)

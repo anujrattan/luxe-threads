@@ -10,9 +10,12 @@ interface RateProductModalProps {
   onClose: () => void;
   productId: string;
   productName: string;
+  productImageUrl?: string; // Product thumbnail image
   orderNumber: string;
+  email?: string; // For guest users
   existingRating?: number;
-  onRatingSubmitted?: () => void;
+  onSuccess?: (rating: number) => void;
+  onRatingSubmitted?: () => void; // Deprecated, use onSuccess instead
 }
 
 export const RateProductModal: React.FC<RateProductModalProps> = ({
@@ -20,8 +23,11 @@ export const RateProductModal: React.FC<RateProductModalProps> = ({
   onClose,
   productId,
   productName,
+  productImageUrl,
   orderNumber,
+  email,
   existingRating,
+  onSuccess,
   onRatingSubmitted,
 }) => {
   const [rating, setRating] = useState(existingRating || 0);
@@ -42,13 +48,18 @@ export const RateProductModal: React.FC<RateProductModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Get order ID from order number first
-      const order = await api.getOrderByNumber(orderNumber);
+      // Get order ID from order number first (pass email for guest users)
+      const response = await api.getOrderByNumber(orderNumber, email);
+      
+      if (!response.success || !response.order) {
+        throw new Error(response.message || 'Failed to fetch order details');
+      }
       
       await api.submitRating({
         product_id: productId,
-        order_id: order.id,
+        order_id: response.order.id,
         rating,
+        ...(email && { email }), // Include email for guest users
       });
 
       showToast(
@@ -56,7 +67,9 @@ export const RateProductModal: React.FC<RateProductModalProps> = ({
         'success'
       );
       
-      if (onRatingSubmitted) {
+      if (onSuccess) {
+        onSuccess(rating);
+      } else if (onRatingSubmitted) {
         onRatingSubmitted();
       }
       
@@ -91,6 +104,19 @@ export const RateProductModal: React.FC<RateProductModalProps> = ({
             <XIcon className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Product Thumbnail */}
+        {productImageUrl && (
+          <div className="mb-6 flex justify-center">
+            <div className="w-32 h-32 rounded-lg overflow-hidden border border-white/10 bg-brand-surface">
+              <img
+                src={productImageUrl}
+                alt={productName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Rating */}
         <div className="flex flex-col items-center py-6">

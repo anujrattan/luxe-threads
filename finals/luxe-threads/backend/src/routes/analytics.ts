@@ -85,6 +85,13 @@ router.get(
         (req.query.granularity as Granularity) || "day";
 
       // 1) Fetch orders in date range
+      const serverNow = new Date();
+      console.log(`[ANALYTICS] Server time: ${serverNow.toISOString()} (${serverNow.toString()})`);
+      console.log(`[ANALYTICS] Fetching orders from ${fromIso} to ${toIso}`);
+      console.log(`[ANALYTICS] Date range in local time:`, {
+        from: new Date(fromIso).toString(),
+        to: new Date(toIso).toString()
+      });
       const { data: orders, error: ordersError } = await supabaseAdmin
         .from("orders")
         .select(
@@ -94,10 +101,26 @@ router.get(
         .lte("created_at", toIso);
 
       if (ordersError) {
+        console.error("[ANALYTICS] Error fetching orders:", ordersError);
         throw ordersError;
       }
 
       const allOrders = orders || [];
+      console.log(`[ANALYTICS] Found ${allOrders.length} orders in date range`);
+      console.log(`[ANALYTICS] Order statuses:`, allOrders.map(o => ({ 
+        id: o.id, 
+        status: o.status, 
+        status_lower: (o.status || '').toLowerCase().trim(),
+        created_at: o.created_at 
+      })));
+      
+      // Count statuses for debugging
+      const statusCounts: Record<string, number> = {};
+      allOrders.forEach(o => {
+        const s = (o.status || 'unknown').toLowerCase().trim();
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      });
+      console.log(`[ANALYTICS] Status counts:`, statusCounts);
       const orderIds = allOrders.map((o) => o.id);
 
       // 2) Fetch order items for product/category analytics
@@ -192,7 +215,8 @@ router.get(
 
       for (const order of allOrders) {
         totalOrders += 1;
-        const status = order.status || "unknown";
+        // Normalize status to lowercase and trim whitespace
+        const status = (order.status || "unknown").toLowerCase().trim();
         const gateway = order.gateway || "unknown";
         const partner = order.fulfillment_partner || "Unassigned";
         const totalAmount = Number(order.total_amount) || 0;
@@ -245,6 +269,15 @@ router.get(
       }
 
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      
+      // Debug summary
+      console.log(`[ANALYTICS] Summary:`, {
+        totalOrders,
+        totalDeliveredOrders,
+        totalRevenue,
+        totalDeliveredRevenue,
+        byStatus: Object.keys(byStatus).map(k => ({ status: k, count: byStatus[k].count }))
+      });
 
       // Product-level aggregation
       const byProductMap: Map<

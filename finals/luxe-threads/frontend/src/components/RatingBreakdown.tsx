@@ -1,24 +1,69 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StarIcon } from './icons';
+import api from '../services/api';
 
 interface RatingBreakdownProps {
-  averageRating: number;
-  totalRatings: number;
-  breakdown: {
-    "5": number;
-    "4": number;
-    "3": number;
-    "2": number;
-    "1": number;
-  };
+  productId: string;
 }
 
 export const RatingBreakdown: React.FC<RatingBreakdownProps> = ({
-  averageRating,
-  totalRatings,
-  breakdown,
+  productId,
 }) => {
-  if (totalRatings === 0) {
+  const [ratingData, setRatingData] = useState<{
+    averageRating: number;
+    totalRatings: number;
+    breakdown: {
+      "5": number;
+      "4": number;
+      "3": number;
+      "2": number;
+      "1": number;
+    };
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRatings = async () => {
+      try {
+        setLoading(true);
+        const response = await api.getProductRatings(productId);
+        if (response.success) {
+          setRatingData({
+            averageRating: response.averageRating || 0,
+            totalRatings: response.totalRatings || 0,
+            breakdown: response.breakdown || {
+              "5": 0,
+              "4": 0,
+              "3": 0,
+              "2": 0,
+              "1": 0,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch ratings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (productId) {
+      fetchRatings();
+    }
+  }, [productId]);
+
+  if (loading) {
+    return (
+      <div className="bg-brand-surface rounded-lg border border-white/10 p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4"></div>
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ratingData || ratingData.totalRatings === 0) {
     return (
       <div className="bg-brand-surface rounded-lg border border-white/10 p-6">
         <h3 className="text-lg font-bold text-brand-primary mb-2">
@@ -30,6 +75,8 @@ export const RatingBreakdown: React.FC<RatingBreakdownProps> = ({
       </div>
     );
   }
+
+  const { averageRating, totalRatings, breakdown } = ratingData;
 
   const getPercentage = (count: number): number => {
     return totalRatings > 0 ? (count / totalRatings) * 100 : 0;

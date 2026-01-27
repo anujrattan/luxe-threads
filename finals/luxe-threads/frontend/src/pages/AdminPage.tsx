@@ -16,12 +16,15 @@ import { OrderDetailView } from "./admin/components/OrderDetailView";
 import { useAdminData } from "./admin/hooks/useAdminData";
 import { useAdminOrders } from "./admin/hooks/useAdminOrders";
 import { AdminTab } from "./admin/types";
+import { Modal } from "../components/Modal";
+import { ArrowLeftIcon } from "../components/icons";
 
 export const AdminPage: React.FC = () => {
   const { currency } = useApp();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<AdminTab>("categories");
   const [showForm, setShowForm] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [failedCategoryImages, setFailedCategoryImages] = useState<Set<string>>(
@@ -45,17 +48,11 @@ export const AdminPage: React.FC = () => {
     selectedOrder,
     orderProducts,
     ordersLoading,
-    updatingStatus,
-    updatingFulfillmentPartner,
-    updatingPartnerOrderId,
-    partnerOrderIdInput,
+    isSaving,
     fetchOrders,
     selectOrder,
     clearSelection,
-    updateOrderStatus,
-    updateFulfillmentPartner,
-    updatePartnerOrderId,
-    setPartnerOrderIdInput,
+    saveOrderChanges,
   } = useAdminOrders();
 
   // Refetch data when switching tabs
@@ -86,6 +83,7 @@ export const AdminPage: React.FC = () => {
 
   const handleSave = async () => {
     setShowForm(false);
+    setShowCategoryModal(false);
     setEditingProduct(null);
     setEditingCategory(null);
     await refetchAll();
@@ -93,7 +91,13 @@ export const AdminPage: React.FC = () => {
 
   const handleCancel = () => {
     setShowForm(false);
+    setShowCategoryModal(false);
     setEditingProduct(null);
+    setEditingCategory(null);
+  };
+
+  const handleCategoryModalClose = () => {
+    setShowCategoryModal(false);
     setEditingCategory(null);
   };
 
@@ -106,12 +110,12 @@ export const AdminPage: React.FC = () => {
 
   const handleCategoryEdit = (category: Category) => {
     setEditingCategory(category);
-    setShowForm(true);
+    setShowCategoryModal(true);
   };
 
   const handleCategoryAddNew = () => {
     setEditingCategory(null);
-    setShowForm(true);
+    setShowCategoryModal(true);
   };
 
   // Calculate stats
@@ -138,9 +142,20 @@ export const AdminPage: React.FC = () => {
           <h1 className="text-5xl md:text-6xl font-display font-bold mb-3 text-brand-primary dark:bg-gradient-to-r dark:from-purple-400 dark:via-pink-500 dark:to-purple-600 dark:bg-clip-text dark:text-transparent">
             Admin Console
           </h1>
-          <p className="text-lg md:text-xl text-brand-secondary font-medium">
+          <p className="text-lg md:text-xl text-brand-secondary font-medium mb-4">
             Manage your store's categories and products
           </p>
+          {/* Back Button - Only show when in form view */}
+          {showForm && (
+            <button
+              onClick={handleCancel}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-brand-primary bg-white dark:bg-brand-surface border-2 border-purple-500 dark:border-purple-400 rounded-lg hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-pink-500/10 dark:hover:from-purple-500/20 dark:hover:to-pink-500/20 hover:border-purple-600 dark:hover:border-purple-300 transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+              aria-label="Go back to products list"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              <span>Back to Products</span>
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
@@ -159,23 +174,13 @@ export const AdminPage: React.FC = () => {
           {/* Main Content Area */}
           <main className="flex-1 min-w-0">
             {showForm ? (
-              // Form View
-              editingProduct !== null || editingCategory !== null ? (
-                editingProduct !== null ? (
-                  <ProductForm
-                    product={editingProduct}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                    categories={categories}
-                  />
-                ) : (
-                  <CategoryForm
-                    category={editingCategory}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                  />
-                )
-              ) : null
+              // Product Form View (still full screen for now)
+              <ProductForm
+                product={editingProduct}
+                onSave={handleSave}
+                onCancel={handleCancel}
+                categories={categories}
+              />
             ) : (
               <>
                 {/* Header Section */}
@@ -226,14 +231,8 @@ export const AdminPage: React.FC = () => {
                       orderProducts={orderProducts}
                       currency={currency}
                       onClose={clearSelection}
-                      onStatusUpdate={updateOrderStatus}
-                      onFulfillmentPartnerUpdate={updateFulfillmentPartner}
-                      onPartnerOrderIdUpdate={updatePartnerOrderId}
-                      updatingStatus={updatingStatus}
-                      updatingFulfillmentPartner={updatingFulfillmentPartner}
-                      updatingPartnerOrderId={updatingPartnerOrderId}
-                      partnerOrderIdInput={partnerOrderIdInput}
-                      onPartnerOrderIdInputChange={setPartnerOrderIdInput}
+                      onSave={saveOrderChanges}
+                      isSaving={isSaving}
                     />
                   ) : (
                     <OrdersView
@@ -247,6 +246,20 @@ export const AdminPage: React.FC = () => {
               </>
             )}
           </main>
+
+          {/* Category Modal */}
+          <Modal
+            isOpen={showCategoryModal}
+            onClose={handleCategoryModalClose}
+            title={editingCategory ? "Edit Category" : "Add Category"}
+            size="2xl"
+          >
+            <CategoryForm
+              category={editingCategory}
+              onSave={handleSave}
+              onCancel={handleCategoryModalClose}
+            />
+          </Modal>
         </div>
       </div>
     </div>

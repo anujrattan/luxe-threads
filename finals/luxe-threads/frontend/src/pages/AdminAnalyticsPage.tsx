@@ -7,39 +7,58 @@ import { LineChart } from '../components/LineChart';
 
 type Granularity = 'day' | 'week' | 'month';
 
-type Preset = 'last7' | 'last30' | 'thisMonth' | 'custom';
+type Preset = 'today' | 'last7' | 'last30' | 'thisMonth' | 'custom';
 
-const formatDateForInput = (date: Date) => date.toISOString().slice(0, 10);
+const formatDateForInput = (date: Date) => {
+  // Format as YYYY-MM-DD in local timezone (not UTC)
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
-const parseDateInput = (value: string) => new Date(value + 'T00:00:00');
+const parseDateInput = (value: string) => {
+  // Parse YYYY-MM-DD as local date (not UTC)
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 export const AdminAnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any | null>(null);
 
-  const [preset, setPreset] = useState<Preset>('last7');
+  const [preset, setPreset] = useState<Preset>('today');
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
 
   const applyPreset = (p: Preset) => {
     const now = new Date();
+    // Use local date to avoid timezone issues
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    if (p === 'last7') {
+    if (p === 'today') {
+      // Today only
+      setFromDate(formatDateForInput(today));
+      setToDate(formatDateForInput(today));
+      setGranularity('day');
+    } else if (p === 'last7') {
+      // Last 7 days including today (today - 6 days = 7 days total)
       const from = new Date(today);
       from.setDate(from.getDate() - 6);
       setFromDate(formatDateForInput(from));
       setToDate(formatDateForInput(today));
       setGranularity('day');
     } else if (p === 'last30') {
+      // Last 30 days including today (today - 29 days = 30 days total)
       const from = new Date(today);
       from.setDate(from.getDate() - 29);
       setFromDate(formatDateForInput(from));
       setToDate(formatDateForInput(today));
       setGranularity('day');
     } else if (p === 'thisMonth') {
+      // From first day of month to today
       const from = new Date(today.getFullYear(), today.getMonth(), 1);
       setFromDate(formatDateForInput(from));
       setToDate(formatDateForInput(today));
@@ -53,14 +72,31 @@ export const AdminAnalyticsPage: React.FC = () => {
       setError(null);
 
       const params: { from?: string; to?: string; granularity?: Granularity } = {};
-      if (fromDate) params.from = parseDateInput(fromDate).toISOString();
+      if (fromDate) {
+        // Start of day (00:00:00) in local timezone, then convert to UTC ISO string
+        const from = parseDateInput(fromDate);
+        from.setHours(0, 0, 0, 0);
+        params.from = from.toISOString();
+      }
       if (toDate) {
-        // Inclusive end date: add almost one full day minus a second
+        // End of day (23:59:59.999) in local timezone, then convert to UTC ISO string - inclusive
         const to = parseDateInput(toDate);
         to.setHours(23, 59, 59, 999);
         params.to = to.toISOString();
       }
       params.granularity = granularity;
+      
+      // Debug logging
+      const now = new Date();
+      console.log('[ANALYTICS FRONTEND] Current system time:', {
+        local: now.toString(),
+        utc: now.toISOString(),
+        localDate: formatDateForInput(now),
+        queryFrom: params.from,
+        queryTo: params.to,
+        fromDate,
+        toDate
+      });
 
       const response = await api.getAnalyticsOverview(params);
       if (!response.success) {
@@ -76,7 +112,7 @@ export const AdminAnalyticsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    applyPreset('last7');
+    applyPreset('today');
   }, []);
 
   useEffect(() => {
@@ -150,16 +186,19 @@ export const AdminAnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-brand-primary mb-2">Analytics Dashboard</h1>
-        <p className="text-base text-brand-secondary">
-          Monitor order flow, revenue and partner performance
-        </p>
-      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
+        <button
+          onClick={() => { setPreset('today'); applyPreset('today'); }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            preset === 'today' 
+              ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700' 
+              : 'bg-white dark:bg-brand-surface text-brand-primary border border-gray-300 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'
+          }`}
+        >
+          Today
+        </button>
         <button
           onClick={() => { setPreset('last7'); applyPreset('last7'); }}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${

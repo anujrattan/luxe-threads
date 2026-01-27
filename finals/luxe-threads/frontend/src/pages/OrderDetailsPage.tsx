@@ -17,7 +17,7 @@ export const OrderDetailsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [userRatings, setUserRatings] = useState<Record<string, number>>({});
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<{ id: string; name: string } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string; name: string; imageUrl?: string } | null>(null);
 
   useEffect(() => {
     if (!orderNumber) {
@@ -60,7 +60,8 @@ export const OrderDetailsPage: React.FC = () => {
           
           // Load user ratings for this order (authenticated or guest)
           try {
-            const ratingsResponse = await api.getOrderRatings(orderNumber);
+            const email = searchParams.get('email'); // For guest users
+            const ratingsResponse = await api.getOrderRatings(orderNumber, email || undefined);
             if (ratingsResponse.success) {
               const ratingsMap: Record<string, number> = {};
               ratingsResponse.ratings.forEach((r: any) => {
@@ -182,6 +183,44 @@ export const OrderDetailsPage: React.FC = () => {
               <p className="text-brand-primary font-medium">{order.gateway}</p>
             </div>
           </div>
+
+          {/* Tracking Information - Show when order is shipped or delivered */}
+          {(order.status === 'shipped' || order.status === 'delivered') && 
+           (order.tracking_number || order.tracking_url || order.shipping_partner) && (
+            <div className="mt-6 pt-6 border-t border-white/10">
+              <h3 className="text-lg font-semibold text-brand-primary mb-4">Tracking Information</h3>
+              <div className="space-y-3">
+                {order.shipping_partner && (
+                  <div>
+                    <p className="text-sm text-brand-secondary mb-1">Shipping Partner</p>
+                    <p className="text-brand-primary font-medium">{order.shipping_partner}</p>
+                  </div>
+                )}
+                {order.tracking_number && (
+                  <div>
+                    <p className="text-sm text-brand-secondary mb-1">Tracking Number</p>
+                    <p className="text-brand-primary font-mono font-medium">{order.tracking_number}</p>
+                  </div>
+                )}
+                {order.tracking_url && (
+                  <div>
+                    <p className="text-sm text-brand-secondary mb-1">Track Your Order</p>
+                    <a
+                      href={order.tracking_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-500 hover:text-purple-400 underline font-medium inline-flex items-center gap-2"
+                    >
+                      View Tracking Details
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Order Items */}
@@ -225,7 +264,11 @@ export const OrderDetailsPage: React.FC = () => {
                         {userRatings[item.product_id] ? (
                           <button
                             onClick={() => {
-                              setSelectedProduct({ id: item.product_id, name: item.product_name });
+                              setSelectedProduct({ 
+                                id: item.product_id, 
+                                name: item.product_name,
+                                imageUrl: product?.main_image_url || product?.imageUrl
+                              });
                               setRatingModalOpen(true);
                             }}
                             className="flex flex-col items-end gap-1 text-xs hover:opacity-80 transition-opacity"
@@ -236,7 +279,11 @@ export const OrderDetailsPage: React.FC = () => {
                         ) : (
                           <Button
                             onClick={() => {
-                              setSelectedProduct({ id: item.product_id, name: item.product_name });
+                              setSelectedProduct({ 
+                                id: item.product_id, 
+                                name: item.product_name,
+                                imageUrl: product?.main_image_url || product?.imageUrl
+                              });
                               setRatingModalOpen(true);
                             }}
                             variant="outline"
@@ -341,7 +388,9 @@ export const OrderDetailsPage: React.FC = () => {
           }}
           productId={selectedProduct.id}
           productName={selectedProduct.name}
+          productImageUrl={selectedProduct.imageUrl}
           orderNumber={orderNumber!}
+          email={!isAuthenticated ? searchParams.get('email') || undefined : undefined}
           onSuccess={(rating) => {
             setUserRatings((prev) => ({ ...prev, [selectedProduct.id]: rating }));
             setRatingModalOpen(false);

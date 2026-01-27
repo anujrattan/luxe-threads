@@ -6,6 +6,92 @@ import { Router } from 'express';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { supabase } from '../services/supabase.js';
 import { uploadCategoryImage, extractFilePathFromUrl, deleteFile } from '../services/storage.js';
+import { cache, cacheKeys } from '../services/redis.js';
+
+const CACHE_TTL = 3600; // 1 hour
+
+// Helper function to upsert category in cache arrays
+async function upsertCategoryInCacheArrays(category: any) {
+  try {
+    // Upsert in categories:all cache (admin)
+    const allCategories = await cache.getJSON<any[]>(cacheKeys.categories);
+    if (allCategories) {
+      const index = allCategories.findIndex((c: any) => c.id === category.id);
+      if (index >= 0) {
+        allCategories[index] = category;
+      } else {
+        allCategories.push(category);
+        // Sort by name to maintain order
+        allCategories.sort((a: any, b: any) => a.name.localeCompare(b.name));
+      }
+      await cache.setJSON(cacheKeys.categories, allCategories, CACHE_TTL);
+    }
+
+    // Upsert in categories:active cache (public) - only if active
+    if (category.isActive !== false) {
+      const activeCategories = await cache.getJSON<any[]>(cacheKeys.categoriesActive);
+      if (activeCategories) {
+        const index = activeCategories.findIndex((c: any) => c.id === category.id);
+        if (index >= 0) {
+          activeCategories[index] = category;
+        } else {
+          activeCategories.push(category);
+          // Sort by name to maintain order
+          activeCategories.sort((a: any, b: any) => a.name.localeCompare(b.name));
+        }
+        await cache.setJSON(cacheKeys.categoriesActive, activeCategories, CACHE_TTL);
+      }
+    } else {
+      // If category is now inactive, remove from active cache
+      await removeCategoryFromActiveCache(category.id);
+    }
+
+    // Upsert individual category cache
+    if (category.slug) {
+      await cache.setJSON(cacheKeys.category(category.slug), category, CACHE_TTL);
+    }
+  } catch (error) {
+    console.error('Error upserting category in cache arrays:', error);
+    // Non-fatal - continue even if cache update fails
+  }
+}
+
+// Helper function to remove category from cache arrays
+async function removeCategoryFromCacheArrays(categoryId: string, categorySlug?: string) {
+  try {
+    // Remove from categories:all cache
+    const allCategories = await cache.getJSON<any[]>(cacheKeys.categories);
+    if (allCategories) {
+      const filtered = allCategories.filter((c: any) => c.id !== categoryId);
+      await cache.setJSON(cacheKeys.categories, filtered, CACHE_TTL);
+    }
+
+    // Remove from categories:active cache
+    await removeCategoryFromActiveCache(categoryId);
+
+    // Remove individual category cache
+    if (categorySlug) {
+      await cache.del(cacheKeys.category(categorySlug));
+    }
+  } catch (error) {
+    console.error('Error removing category from cache arrays:', error);
+    // Non-fatal - continue even if cache update fails
+  }
+}
+
+// Helper function to remove category from active cache only
+async function removeCategoryFromActiveCache(categoryId: string) {
+  try {
+    const activeCategories = await cache.getJSON<any[]>(cacheKeys.categoriesActive);
+    if (activeCategories) {
+      const filtered = activeCategories.filter((c: any) => c.id !== categoryId);
+      await cache.setJSON(cacheKeys.categoriesActive, filtered, CACHE_TTL);
+    }
+  } catch (error) {
+    console.error('Error removing category from active cache:', error);
+    // Non-fatal - continue even if cache update fails
+  }
+}
 
 const router = Router();
 
@@ -21,6 +107,17 @@ const transformCategory = (dbCategory: any) => ({
 // Get all categories (public) - only returns active categories
 router.get('/', async (req, res, next) => {
   try {
+    // Try to get from cache first
+    const cacheKey = cacheKeys.categoriesActive;
+    const cachedData = await cache.getJSON<any[]>(cacheKey);
+    if (cachedData) {
+      console.log(`📦 Cache hit for ${cacheKey}`);
+      return res.json(cachedData);
+    }
+    
+    console.log(`📦 Cache miss for ${cacheKey}, fetching from database`);
+    
+    // Cache miss - fetch from database
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -31,6 +128,9 @@ router.get('/', async (req, res, next) => {
     
     const transformed = data.map(transformCategory);
     
+    // Store in cache
+    await cache.setJSON(cacheKey, transformed, CACHE_TTL);
+    
     res.json(transformed);
   } catch (error: any) {
     next(error);
@@ -40,6 +140,17 @@ router.get('/', async (req, res, next) => {
 // Get all categories including inactive ones (admin only)
 router.get('/admin/all', authenticateToken, requireAdmin, async (req: AuthRequest, res, next) => {
   try {
+    // Try to get from cache first
+    const cacheKey = cacheKeys.categories;
+    const cachedData = await cache.getJSON<any[]>(cacheKey);
+    if (cachedData) {
+      console.log(`📦 Cache hit for ${cacheKey}`);
+      return res.json(cachedData);
+    }
+    
+    console.log(`📦 Cache miss for ${cacheKey}, fetching from database`);
+    
+    // Cache miss - fetch from database
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -48,6 +159,9 @@ router.get('/admin/all', authenticateToken, requireAdmin, async (req: AuthReques
     if (error) throw error;
     
     const transformed = data.map(transformCategory);
+    
+    // Store in cache
+    await cache.setJSON(cacheKey, transformed, CACHE_TTL);
     
     res.json(transformed);
   } catch (error: any) {
@@ -60,6 +174,17 @@ router.get('/:slug', async (req, res, next) => {
   try {
     const { slug } = req.params;
     
+    // Try to get from cache first
+    const cacheKey = cacheKeys.category(slug);
+    const cachedData = await cache.getJSON<any>(cacheKey);
+    if (cachedData) {
+      console.log(`📦 Cache hit for ${cacheKey}`);
+      return res.json(cachedData);
+    }
+    
+    console.log(`📦 Cache miss for ${cacheKey}, fetching from database`);
+    
+    // Cache miss - fetch from database
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -70,6 +195,9 @@ router.get('/:slug', async (req, res, next) => {
     if (error) throw error;
     
     const transformed = transformCategory(data);
+    
+    // Store in cache
+    await cache.setJSON(cacheKey, transformed, CACHE_TTL);
     
     res.json(transformed);
   } catch (error: any) {
@@ -133,6 +261,9 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res, 
     if (error) throw error;
     
     const transformed = transformCategory(data);
+    
+    // Upsert category in cache arrays
+    await upsertCategoryInCacheArrays(transformed);
     
     res.status(201).json(transformed);
   } catch (error: any) {
@@ -221,6 +352,18 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
     
     const transformed = transformCategory(data);
     
+    // Get old category slug for cache cleanup if slug changed
+    const oldSlug = existingCategory?.slug;
+    const newSlug = transformed.slug;
+    
+    // Upsert category in cache arrays
+    await upsertCategoryInCacheArrays(transformed);
+    
+    // If slug changed, remove old individual category cache
+    if (oldSlug && newSlug && oldSlug !== newSlug) {
+      await cache.del(cacheKeys.category(oldSlug));
+    }
+    
     res.json(transformed);
   } catch (error: any) {
     next(error);
@@ -258,6 +401,9 @@ router.patch('/:id/toggle-active', authenticateToken, requireAdmin, async (req: 
     
     const transformed = transformCategory(data);
     
+    // Upsert category in cache arrays (will handle active/inactive logic)
+    await upsertCategoryInCacheArrays(transformed);
+    
     res.json(transformed);
   } catch (error: any) {
     next(error);
@@ -269,10 +415,10 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, 
   try {
     const { id } = req.params;
     
-    // Get category image URL before deleting
+    // Get category data (image URL and slug) before deleting
     const { data: category } = await supabase
       .from('categories')
-      .select('image_url')
+      .select('image_url, slug')
       .eq('id', id)
       .single();
     
@@ -296,6 +442,12 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, 
         }
       }
     }
+    
+    // Get category slug before deletion for cache cleanup
+    const categorySlug = category?.slug;
+    
+    // Remove category from cache arrays
+    await removeCategoryFromCacheArrays(id, categorySlug);
     
     res.json({ success: true });
   } catch (error: any) {

@@ -8,6 +8,9 @@ import { Button } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils/currency';
 import { getColorName, getColorHex } from '../utils/colorUtils';
+import { SEOHead } from '../components/SEOHead';
+import { StructuredData, createBreadcrumbSchema } from '../components/StructuredData';
+import { DEFAULT_SITE_URL } from '../utils/seo';
 
 type SortOption = 'default' | 'price-asc' | 'price-desc' | 'name-asc';
 
@@ -47,6 +50,21 @@ export const ProductListPage: React.FC = () => {
   }, [slug]);
 
   const categoryName = slug.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  
+  // SEO Data
+  const seoData = {
+    title: `${categoryName} - Premium Apparel | Luxe Threads`,
+    description: `Browse our collection of premium ${categoryName.toLowerCase()}. High-quality, designer ${categoryName.toLowerCase()} with free shipping on orders over ₹500.`,
+    keywords: `${categoryName}, premium ${categoryName.toLowerCase()}, luxury ${categoryName.toLowerCase()}, designer ${categoryName.toLowerCase()}, ${categoryName.toLowerCase()} online`,
+    type: 'website' as const,
+    url: `${DEFAULT_SITE_URL}/category/${slug}`,
+  };
+
+  // Breadcrumb schema
+  const breadcrumbItems = [
+    { name: 'Home', url: DEFAULT_SITE_URL },
+    { name: categoryName, url: `${DEFAULT_SITE_URL}/category/${slug}` },
+  ];
   
   // Extract unique sizes and colors from products
   const availableSizes = useMemo(() => {
@@ -140,7 +158,10 @@ export const ProductListPage: React.FC = () => {
   const activeFilterCount = selectedSizes.length + selectedColors.length + (sortBy !== 'default' ? 1 : 0);
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fadeIn">
+    <>
+      <SEOHead {...seoData} />
+      <StructuredData data={createBreadcrumbSchema(breadcrumbItems)} />
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fadeIn">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <div>
           <h1 className="text-3xl font-display font-bold tracking-tight text-brand-primary">{categoryName}</h1>
@@ -328,5 +349,6 @@ export const ProductListPage: React.FC = () => {
         </main>
       </div>
     </div>
+    </>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Product } from "../types";
 import api from "../services/api";
 import { ProductCard } from "../components/ProductCard";
@@ -18,6 +18,8 @@ import {
 } from "../components/icons";
 import { RotatingText } from "../components/RotatingText";
 import { TestimonialsCarousel } from "../components/TestimonialsCarousel";
+import { SEOHead } from "../components/SEOHead";
+import { StructuredData, OrganizationSchema, WebsiteSchema } from "../components/StructuredData";
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -82,8 +84,20 @@ export const HomePage: React.FC = () => {
     },
   ];
 
+  // SEO Data
+  const seoData = {
+    title: "Luxe Threads - Premium Apparel & Custom Clothing Online",
+    description: "Shop premium apparel and custom clothing at Luxe Threads. Designer t-shirts, luxury fashion, and print-on-demand apparel. Free shipping on orders over ₹500.",
+    keywords: "premium apparel, luxury clothing, custom t-shirts, designer fashion, print on demand, luxury fashion online, custom clothing, designer t-shirts",
+    type: "website" as const,
+  };
+
   return (
-    <div className="space-y-8 md:space-y-12 animate-fadeIn pb-16">
+    <>
+      <SEOHead {...seoData} />
+      <StructuredData data={OrganizationSchema} />
+      <StructuredData data={WebsiteSchema} />
+      <div className="space-y-8 md:space-y-12 animate-fadeIn pb-16">
       {/* Hero Section */}
       <section
         className="relative h-[70vh] md:h-[90vh] bg-cover bg-center -mt-2"
@@ -399,5 +413,6 @@ export const HomePage: React.FC = () => {
         <TestimonialsCarousel testimonials={testimonials} />
       </section>
     </div>
+    </>
   );
 };

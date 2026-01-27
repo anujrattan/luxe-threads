@@ -1,6 +1,6 @@
-import React from 'react';
-import { Card, Button } from '../../../components/ui';
-import { ShoppingBagIcon, EditIcon } from '../../../components/icons';
+import React, { useState, useMemo } from 'react';
+import { Card, Button, Input } from '../../../components/ui';
+import { ShoppingBagIcon, EditIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon } from '../../../components/icons';
 import { formatCurrency } from '../../../utils/currency';
 
 interface OrdersViewProps {
@@ -10,12 +10,110 @@ interface OrdersViewProps {
   onSelectOrder: (order: any) => void;
 }
 
+type SortField = 'order_number' | 'status' | null;
+type SortDirection = 'asc' | 'desc';
+type OrderStatus = 'all' | 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' | 'failed';
+
 export const OrdersView: React.FC<OrdersViewProps> = ({
   orders,
   loading,
   currency,
   onSelectOrder,
 }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus>('all');
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Status options
+  const statusOptions: { value: OrderStatus; label: string; count?: number }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'shipped', label: 'Shipped' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'failed', label: 'Failed' },
+  ];
+
+  // Filter and search orders
+  const filteredOrders = useMemo(() => {
+    let filtered = [...orders];
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Search by order number
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(order => 
+        order.order_number?.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort orders
+    if (sortField) {
+      filtered.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        if (sortField === 'order_number') {
+          aValue = a.order_number || '';
+          bValue = b.order_number || '';
+        } else if (sortField === 'status') {
+          aValue = a.status || '';
+          bValue = b.status || '';
+        }
+
+        // String comparison
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const comparison = aValue.localeCompare(bValue);
+          return sortDirection === 'asc' ? comparison : -comparison;
+        }
+
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [orders, statusFilter, searchQuery, sortField, sortDirection]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+
+  // Handle sort
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1); // Reset to first page on sort
+  };
+
+  // Handle status filter change
+  const handleStatusFilter = (status: OrderStatus) => {
+    setStatusFilter(status);
+    setCurrentPage(1); // Reset to first page on filter
+  };
+
+  // Handle search change
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
   if (loading) {
     return (
       <Card className="p-8">
@@ -45,23 +143,113 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   }
 
   return (
-    <Card className="overflow-hidden border-white/10">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-white/10">
-          <thead className="bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-            <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-brand-primary uppercase tracking-wider">Order #</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-brand-primary uppercase tracking-wider">Customer</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Items</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Total</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Payment</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Date</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-brand-surface divide-y divide-white/10">
-            {orders.map((order) => (
+    <div className="space-y-6">
+      {/* Search and Filters */}
+      <Card className="p-4 border-white/10">
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-brand-secondary" />
+            <Input
+              type="text"
+              placeholder="Search by order number..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+
+          {/* Status Filter Pills */}
+          <div className="flex flex-wrap gap-2">
+            {statusOptions.map((option) => {
+              const count = option.value === 'all' 
+                ? orders.length 
+                : orders.filter(o => o.status === option.value).length;
+              
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => handleStatusFilter(option.value)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    statusFilter === option.value
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                      : 'bg-white dark:bg-brand-surface text-brand-secondary hover:text-brand-primary border border-gray-200 dark:border-white/10 hover:border-purple-400/50'
+                  }`}
+                >
+                  {option.label}
+                  {count > 0 && (
+                    <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs ${
+                      statusFilter === option.value
+                        ? 'bg-white/20 text-white'
+                        : 'bg-gray-100 dark:bg-white/10 text-brand-secondary'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Card>
+
+      {/* Orders Table */}
+      <Card className="overflow-hidden border-white/10">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-brand-primary uppercase tracking-wider">
+                  <button
+                    onClick={() => handleSort('order_number')}
+                    className="flex items-center gap-1 hover:text-purple-400 transition-colors"
+                  >
+                    Order #
+                    {sortField === 'order_number' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUpIcon className="w-4 h-4" />
+                      ) : (
+                        <ChevronDownIcon className="w-4 h-4" />
+                      )
+                    )}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-brand-primary uppercase tracking-wider">Customer</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Items</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Total</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center justify-center gap-1 hover:text-purple-400 transition-colors mx-auto"
+                  >
+                    Status
+                    {sortField === 'status' && (
+                      sortDirection === 'asc' ? (
+                        <ChevronUpIcon className="w-4 h-4" />
+                      ) : (
+                        <ChevronDownIcon className="w-4 h-4" />
+                      )
+                    )}
+                  </button>
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Payment</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Date</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-brand-primary uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-brand-surface divide-y divide-white/10">
+              {paginatedOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <p className="text-brand-secondary">
+                      {searchQuery || statusFilter !== 'all'
+                        ? 'No orders found matching your criteria'
+                        : 'No orders found'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedOrders.map((order) => (
               <tr 
                 key={order.id} 
                 className="hover:bg-white/5 transition-colors group"
@@ -121,11 +309,69 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   </Button>
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+            <div className="text-sm text-brand-secondary">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} orders
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm font-medium text-brand-primary bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {[...Array(totalPages)].map((_, index) => {
+                  const page = index + 1;
+                  // Show first page, last page, current page, and pages around current
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                          currentPage === page
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                            : 'text-brand-primary bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (
+                    page === currentPage - 2 ||
+                    page === currentPage + 2
+                  ) {
+                    return <span key={page} className="px-2 text-brand-secondary">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm font-medium text-brand-primary bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 };
 
