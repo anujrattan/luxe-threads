@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Select } from '../../../components/ui';
-import { XIcon } from '../../../components/icons';
+import { XIcon, DownloadIcon, MapPinIcon, PackageIcon, ReceiptIcon, UserIcon } from '../../../components/icons';
 import { formatCurrency } from '../../../utils/currency';
+import api from '../../../services/api';
 
 interface OrderDetailViewProps {
   order: any;
@@ -178,37 +179,26 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     // If successful, original values will be updated via useEffect when order prop updates
   };
 
+  const handleDownloadInvoice = async () => {
+    try {
+      await api.downloadInvoice(order.order_number);
+    } catch (err: any) {
+      alert(err.message || 'Failed to download invoice. Please try again.');
+    }
+  };
+
   return (
     <Card className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <h3 className="text-2xl font-bold text-brand-primary">Order Details</h3>
           {hasUnsavedChanges && (
             <span className="text-xs text-yellow-500 font-medium">• Unsaved changes</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {hasUnsavedChanges && (
-            <Button 
-              onClick={handleCancel} 
-              variant="outline"
-              disabled={isSaving}
-              className="text-sm"
-            >
-              Cancel
-            </Button>
-          )}
-          <Button 
-            onClick={handleSave} 
-            disabled={!hasUnsavedChanges || isSaving}
-            className="text-sm"
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
-          <Button onClick={onClose} variant="ghost" disabled={isSaving}>
-            <XIcon className="w-5 h-5" />
-          </Button>
-        </div>
+        <Button onClick={onClose} variant="ghost" disabled={isSaving}>
+          <XIcon className="w-5 h-5" />
+        </Button>
       </div>
       
       <div className="space-y-6">
@@ -339,22 +329,29 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         {/* Customer Info */}
         {order.users && (
           <div className="border-t border-white/10 pt-6">
-            <h4 className="text-lg font-semibold text-brand-primary mb-4">Customer Information</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-brand-secondary mb-1">Name</p>
-                <p className="text-brand-primary">{order.users.first_name} {order.users.last_name}</p>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-lg border border-blue-500/30 bg-blue-500/10">
+                <UserIcon className="w-5 h-5 text-blue-400" />
               </div>
-              <div>
-                <p className="text-sm text-brand-secondary mb-1">Email</p>
-                <p className="text-brand-primary">{order.users.email}</p>
-              </div>
-              {order.users.phone && (
+              <h4 className="text-lg font-semibold text-brand-primary">Customer Information</h4>
+            </div>
+            <div className="p-4 rounded-lg border border-white/10 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-brand-secondary mb-1">Phone</p>
-                  <p className="text-brand-primary">{order.users.phone}</p>
+                  <p className="text-sm text-brand-secondary mb-1">Name</p>
+                  <p className="text-brand-primary">{order.users.first_name} {order.users.last_name}</p>
                 </div>
-              )}
+                <div>
+                  <p className="text-sm text-brand-secondary mb-1">Email</p>
+                  <p className="text-brand-primary">{order.users.email}</p>
+                </div>
+                {order.users.phone && (
+                  <div>
+                    <p className="text-sm text-brand-secondary mb-1">Phone</p>
+                    <p className="text-brand-primary">{order.users.phone}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -362,9 +359,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         {/* Shipping Address */}
         {order.users && (
           <div className="border-t border-white/10 pt-6">
-            <h4 className="text-lg font-semibold text-brand-primary mb-4">Shipping Address</h4>
-            <div className="bg-brand-bg/50 p-4 rounded-lg">
-              <p className="text-brand-primary">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 rounded-lg border border-purple-500/30 bg-purple-500/10">
+                <MapPinIcon className="w-5 h-5 text-purple-400" />
+              </div>
+              <h4 className="text-lg font-semibold text-brand-primary">Shipping Address</h4>
+            </div>
+            <div className="p-4 rounded-lg border border-white/10">
+              <p className="text-brand-primary font-medium">
                 {order.users.first_name} {order.users.last_name}
               </p>
               <p className="text-brand-primary">{order.users.address1}</p>
@@ -381,12 +383,17 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
         {/* Order Items */}
         <div className="border-t border-white/10 pt-6">
-          <h4 className="text-lg font-semibold text-brand-primary mb-4">Order Items</h4>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg border border-orange-500/30 bg-orange-500/10">
+              <PackageIcon className="w-5 h-5 text-orange-400" />
+            </div>
+            <h4 className="text-lg font-semibold text-brand-primary">Order Items</h4>
+          </div>
           <div className="space-y-3">
             {order.items?.map((item: any, index: number) => {
               const product = orderProducts[item.product_id];
               return (
-                <div key={index} className="flex items-center gap-4 p-4 bg-brand-bg/50 rounded-lg">
+                <div key={index} className="flex items-center gap-4 p-4 rounded-lg border border-white/10">
                   <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-brand-surface border border-white/10">
                     {product?.main_image_url ? (
                       <img
@@ -422,8 +429,13 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
         {/* Order Summary */}
         <div className="border-t border-white/10 pt-6">
-          <h4 className="text-lg font-semibold text-brand-primary mb-4">Order Summary</h4>
-          <div className="bg-brand-bg/50 p-4 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg border border-green-500/30 bg-green-500/10">
+              <ReceiptIcon className="w-5 h-5 text-green-400" />
+            </div>
+            <h4 className="text-lg font-semibold text-brand-primary">Order Summary</h4>
+          </div>
+          <div className="p-4 rounded-lg space-y-2 border border-white/10">
             <div className="flex justify-between text-sm">
               <span className="text-brand-secondary">Subtotal</span>
               <span className="text-brand-primary">{formatCurrency(order.subtotal, currency)}</span>
@@ -445,6 +457,36 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               <span className="text-brand-primary">{order.gateway || 'COD'}</span>
             </div>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-end gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleDownloadInvoice}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 border-2 border-purple-500/50 hover:border-purple-500 text-brand-primary hover:bg-purple-500/10"
+          >
+            <DownloadIcon className="w-4 h-4" />
+            Download Invoice
+          </Button>
+          {hasUnsavedChanges && (
+            <Button 
+              onClick={handleCancel} 
+              variant="outline"
+              disabled={isSaving}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+          )}
+          <Button 
+            onClick={handleSave} 
+            disabled={!hasUnsavedChanges || isSaving}
+            className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </div>
     </Card>

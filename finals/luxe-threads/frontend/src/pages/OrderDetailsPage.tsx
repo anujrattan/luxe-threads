@@ -103,6 +103,16 @@ export const OrderDetailsPage: React.FC = () => {
     }).format(amount);
   };
 
+  const handleDownloadInvoice = async () => {
+    if (!order) return;
+    const email = !isAuthenticated ? searchParams.get('email') || undefined : undefined;
+    try {
+      await api.downloadInvoice(order.order_number, email);
+    } catch (err: any) {
+      alert(err.message || 'Failed to download invoice. Please try again.');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered':
@@ -153,14 +163,26 @@ export const OrderDetailsPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Button variant="outline" onClick={() => navigate(-1)} className="mb-4">
-            ← Back
-          </Button>
-          <h1 className="text-3xl font-bold font-display text-brand-primary mb-2">
-            Order #{order.order_number}
-          </h1>
-          <p className="text-brand-secondary">Placed on {formatDate(order.created_at)}</p>
+        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <Button variant="outline" onClick={() => navigate(-1)} className="mb-4">
+              ← Back
+            </Button>
+            <h1 className="text-3xl font-bold font-display text-brand-primary mb-2">
+              Order #{order.order_number}
+            </h1>
+            <p className="text-brand-secondary">Placed on {formatDate(order.created_at)}</p>
+          </div>
+          {/* Download Invoice - visible only when order is delivered */}
+          {order.status === 'delivered' && (
+            <Button
+              variant="secondary"
+              onClick={handleDownloadInvoice}
+              className="self-start md:self-auto"
+            >
+              Download Invoice (PDF)
+            </Button>
+          )}
         </div>
 
         {/* Order Status */}

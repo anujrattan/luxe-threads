@@ -29,68 +29,68 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   ordersByStatus,
 }) => {
   return (
-    <aside className="lg:w-64 flex-shrink-0">
-      <div className="sticky top-8">
-        {/* Vertical Navigation Tabs */}
+    <aside className="w-full lg:w-64 flex-shrink-0">
+      <div className="lg:sticky lg:top-8">
+        {/* Navigation Tabs - 2x2 Grid on mobile, vertical on desktop */}
         <Card className="p-2 bg-white dark:bg-brand-surface/50 backdrop-blur-sm border border-gray-200 dark:border-white/10">
-          <nav className="flex flex-col gap-2">
+          <nav className="grid grid-cols-2 lg:flex lg:flex-col gap-2">
             <button
               onClick={() => onTabChange('categories')}
-              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left ${
+              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left flex items-center justify-center lg:justify-start ${
                 activeTab === 'categories'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg border-2 border-transparent'
+                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5 border-2 border-gray-200 dark:border-white/20'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col lg:flex-row items-center gap-2 lg:gap-3">
                 <TagIcon className="w-5 h-5" />
-                <span>Categories</span>
+                <span className="text-sm lg:text-base">Categories</span>
               </div>
             </button>
             <button
               onClick={() => onTabChange('products')}
-              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left ${
+              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left flex items-center justify-center lg:justify-start ${
                 activeTab === 'products'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg border-2 border-transparent'
+                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5 border-2 border-gray-200 dark:border-white/20'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col lg:flex-row items-center gap-2 lg:gap-3">
                 <PackageIcon className="w-5 h-5" />
-                <span>Products</span>
+                <span className="text-sm lg:text-base">Products</span>
               </div>
             </button>
             <button
               onClick={() => onTabChange('orders')}
-              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left ${
+              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left flex items-center justify-center lg:justify-start ${
                 activeTab === 'orders'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg border-2 border-transparent'
+                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5 border-2 border-gray-200 dark:border-white/20'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col lg:flex-row items-center gap-2 lg:gap-3">
                 <ShoppingBagIcon className="w-5 h-5" />
-                <span>Orders</span>
+                <span className="text-sm lg:text-base">Orders</span>
               </div>
             </button>
             <button
               onClick={() => onTabChange('analytics')}
-              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left ${
+              className={`px-4 py-3 font-semibold rounded-lg transition-all text-left flex items-center justify-center lg:justify-start ${
                 activeTab === 'analytics'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg border-2 border-transparent'
+                  : 'text-brand-secondary hover:text-brand-primary hover:bg-gray-100 dark:hover:bg-white/5 border-2 border-gray-200 dark:border-white/20'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col lg:flex-row items-center gap-2 lg:gap-3">
                 <BarChartIcon className="w-5 h-5" />
-                <span>Analytics</span>
+                <span className="text-sm lg:text-base">Analytics</span>
               </div>
             </button>
           </nav>
         </Card>
 
-        {/* Stats Cards in Sidebar */}
-        <div className="mt-6 space-y-4">
+        {/* Stats Cards - 2x2 Grid on mobile, vertical on desktop */}
+        <div className="mt-6 grid grid-cols-2 lg:flex lg:flex-col gap-4">
           {activeTab === 'categories' && (
             <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
               <div className="flex items-center justify-between">
@@ -117,7 +117,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           
           {activeTab === 'orders' && (
             <>
-              <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/20">
+              <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-amber-500/10 border-orange-500/20 col-span-2 lg:col-span-1">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-brand-secondary mb-1">Total Orders</p>

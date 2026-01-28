@@ -298,7 +298,7 @@ const api = {
 
   submitOrder: async (orderDetails: any, gateway: 'COD' | 'Prepaid' = 'COD'): Promise<{ success: boolean; orderId?: string; orderNumber?: string; message?: string; razorpay?: any }> => {
     try {
-      const { customer, items, total } = orderDetails;
+      const { customer, items, total, shippingCost: providedShippingCost, codFee: providedCodFee } = orderDetails;
       
       // Use firstName and lastName directly from form (now captured separately)
       const firstName = customer.firstName || customer.first_name || '';
@@ -311,9 +311,12 @@ const api = {
       
       // Calculate amounts (all prices are tax-inclusive on the frontend)
       const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-      const shippingCost = 0; // TODO: Implement shipping cost calculation if needed
+      // Allow caller (CheckoutPage) to provide shipping and COD handling fee
+      const shippingCost = typeof providedShippingCost === 'number' ? providedShippingCost : 0;
+      const codFee = typeof providedCodFee === 'number' ? providedCodFee : 0;
       // For new logic, we don't pre-compute tax on the frontend; backend/admin will reverse-calc GST.
       const taxAmount = 0;
+      const totalAmount = subtotal + shippingCost + codFee;
       
       // Map cart items to line items format expected by backend
       const lineItems = items.map((item: any) => ({
@@ -344,7 +347,8 @@ const api = {
         subtotal: subtotal,
         taxAmount: taxAmount,
         shippingCost: shippingCost,
-        totalAmount: total,
+        codFee: codFee,
+        totalAmount: totalAmount,
         gateway: gateway,
       };
       
@@ -417,6 +421,41 @@ const api = {
         if (email) params.append('email', email);
         const queryString = params.toString();
         return apiCall(`/orders/${orderNumber}${queryString ? `?${queryString}` : ''}`);
+      },
+
+      // Download invoice PDF (handles auth headers and blob download)
+      downloadInvoice: async (orderNumber: string, email?: string): Promise<void> => {
+        const params = new URLSearchParams();
+        if (email) params.append('email', email);
+        const queryString = params.toString();
+        const url = `${API_BASE_URL}/orders/${encodeURIComponent(orderNumber)}/invoice${queryString ? `?${queryString}` : ''}`;
+
+        const token = authService.getToken();
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+          // Try to read JSON error if provided
+          const maybeJson = await response.json().catch(() => null);
+          const message =
+            (maybeJson && (maybeJson.message || maybeJson.error)) ||
+            `Failed to download invoice (status ${response.status})`;
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `Invoice-${orderNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
       },
 
       lookupOrder: async (orderNumber: string, email: string): Promise<any> => {
@@ -528,6 +567,24 @@ const api = {
         return apiCall('/wishlists', {
           method: 'DELETE',
         });
+      },
+
+      // Blog
+      getBlogPosts: async (limit?: number, offset?: number): Promise<any> => {
+        const params = new URLSearchParams();
+        if (limit) params.append('limit', String(limit));
+        if (offset) params.append('offset', String(offset));
+        const queryString = params.toString();
+        return apiCall(`/blog${queryString ? `?${queryString}` : ''}`);
+      },
+
+      getBlogPostBySlug: async (slug: string): Promise<any> => {
+        return apiCall(`/blog/${slug}`);
+      },
+
+      // FAQs (dynamic, with static fallback in UI)
+      getFaqs: async (): Promise<any> => {
+        return apiCall('/faqs');
       },
 
       // Ratings

@@ -10,6 +10,14 @@ import { generateOrderNumber } from "../utils/orderNumber.js";
 import jwt from "jsonwebtoken";
 import { config } from "../config/index.js";
 import { cache } from "../services/redis.js";
+import path from "path";
+import fs from "fs";
+import PDFDocument from "pdfkit";
+import { fileURLToPath } from "url";
+
+// In ESM modules, __dirname is not available by default, so we reconstruct it.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
@@ -163,6 +171,7 @@ interface CreateOrderRequest {
   subtotal: number;
   taxAmount: number;
   shippingCost: number;
+  codFee?: number;
   totalAmount: number;
   gateway: "COD" | "Prepaid"; // Payment gateway
 }
@@ -447,6 +456,8 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       totalTaxAmount += lineTax;
     }
 
+    const codFee = typeof orderData.codFee === "number" ? orderData.codFee : 0;
+
     // Step 4: Create order in database
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
@@ -460,7 +471,8 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         subtotal: Math.round(totalNetAmount),
         tax_amount: Math.round(totalTaxAmount),
         shipping_cost: orderData.shippingCost,
-        total_amount: itemsTotal + orderData.shippingCost,
+        cod_fee: codFee,
+        total_amount: itemsTotal + orderData.shippingCost + codFee,
         payment_status: "pending", // Always start as pending, will be updated after payment verification
         gateway: orderData.gateway,
         // Auto-wired fulfillment partner based on products in the order (may be null)
@@ -679,6 +691,508 @@ router.get(
       });
     } catch (error: any) {
       console.error("Error fetching order:", error);
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/orders/:orderNumber/invoice
+ * Generate and download invoice PDF for an order.
+ *
+ * - Customers: available only when order status is 'delivered'
+ * - Admins: available for any order status
+ * - Guests must provide ?email=query param matching order.user_email
+ */
+router.get(
+  "/:orderNumber/invoice",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { orderNumber } = req.params;
+      const { email } = req.query;
+
+      // Try to authenticate (optional)
+      let authUserId: string | null = null;
+      let authRole: string | null = null;
+      const authHeader = req.headers["authorization"];
+      const token = authHeader && authHeader.split(" ")[1];
+
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, config.jwt.secret) as {
+            userId: string;
+            email: string;
+            role?: string;
+          };
+          authUserId = decoded.userId;
+          authRole = decoded.role || "user";
+        } catch {
+          // Invalid token - treat as guest
+        }
+      }
+
+      // Fetch order directly from DB (source of truth)
+      const { data: order, error: orderError } = await supabaseAdmin
+        .from("orders")
+        .select("*")
+        .eq("order_number", orderNumber)
+        .single();
+
+      if (orderError || !order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+
+      // Authorization / visibility
+      const isAdmin = authRole === "admin";
+      let hasAccess = false;
+
+      if (isAdmin) {
+        hasAccess = true;
+      } else if (authUserId) {
+        // Logged in user - check if order belongs to them
+        const { data: user } = await supabaseAdmin
+          .from("users")
+          .select("id")
+          .eq("auth_user_id", authUserId)
+          .single();
+
+        if (user && order.user_id === user.id) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess && email) {
+        // Guest lookup - verify email matches order
+        if (
+          order.user_email.toLowerCase() ===
+          (email as string).toLowerCase()
+        ) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. Please provide email query parameter for guest orders or log in.",
+        });
+      }
+
+      // For non-admins, only allow invoice after delivery
+      if (!isAdmin && order.status !== "delivered") {
+        return res.status(400).json({
+          success: false,
+          message: "Invoice is available only after the order is delivered.",
+        });
+      }
+
+      // Fetch order items
+      const { data: orderItems, error: itemsError } = await supabaseAdmin
+        .from("order_items")
+        .select("*")
+        .eq("order_id", order.id);
+
+      if (itemsError) {
+        throw itemsError;
+      }
+
+      // Fetch shipping address if present (legacy per-order addresses table)
+      const { data: addresses } = await supabaseAdmin
+        .from("addresses")
+        .select("*")
+        .eq("order_id", order.id)
+        .eq("type", "shipping")
+        .limit(1);
+
+      const shippingAddress =
+        addresses && addresses.length > 0 ? addresses[0] : null;
+
+      // Fetch user profile-based address via user_id (current source of truth)
+      let userAddress: any = null;
+      if (order.user_id) {
+        const { data: user } = await supabaseAdmin
+          .from("users")
+          .select(
+            "first_name, last_name, phone, address1, address2, city, province, zip, country_code"
+          )
+          .eq("id", order.user_id)
+          .single();
+
+        if (user) {
+          userAddress = user;
+        }
+      }
+
+      // Invoice metadata
+      const invoiceNumber = order.order_number;
+      const invoiceDate = new Date(order.created_at);
+
+      // Business details - placeholders for now
+      const businessName = "Luxe Threads";
+      const businessAddress =
+        "Business Address Line 1\nCity, State, PIN\nIndia";
+      const gstinPlaceholder = "GSTIN: To be updated (placeholder)";
+
+      const doc = new PDFDocument({ size: "A4", margin: 50 });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=\"Invoice-${invoiceNumber}.pdf\"`
+      );
+
+      doc.pipe(res);
+
+      // HEADER
+      const leftX = doc.page.margins.left;
+      const rightColWidth = 200;
+      const rightX = doc.page.width - doc.page.margins.right - rightColWidth;
+      let headerTopY = 40;
+
+      // Brand logo at top (optional – if file missing, fall back to text-only header)
+      try {
+        // Use a backend-local assets folder for invoice branding so we are
+        // independent of the frontend build/public paths.
+        // Place the logo at: backend/assets/invoice-logo.png
+        const logoPath = path.resolve(__dirname, "../assets/invoice-logo.png");
+        console.log(`[INVOICE] Attempting to load logo from: ${logoPath}`);
+        console.log(`[INVOICE] Logo file exists: ${fs.existsSync(logoPath)}`);
+
+        if (fs.existsSync(logoPath)) {
+          const logoWidth = 120;
+          const contentWidth =
+            doc.page.width - doc.page.margins.left - doc.page.margins.right;
+          const logoX =
+            doc.page.margins.left + (contentWidth - logoWidth) / 2;
+
+          doc.image(logoPath, logoX, headerTopY, { width: logoWidth });
+          // Add generous spacing below the centered logo before text content
+          headerTopY += 90;
+          console.log(`[INVOICE] ✅ Logo loaded successfully, centered at x=${logoX}`);
+        } else {
+          console.log(
+            `[INVOICE] ⚠️ Logo file not found, using text-only header`
+          );
+        }
+      } catch (err) {
+        console.error(`[INVOICE] ❌ Error loading logo:`, err);
+        // No-op if logo file not found
+      }
+
+      // Business name and address, nicely spaced below logo (or top margin)
+      doc
+        .fontSize(20)
+        .font("Helvetica-Bold")
+        .text(businessName, leftX, headerTopY, {
+          width:
+            doc.page.width -
+            doc.page.margins.left -
+            doc.page.margins.right -
+            rightColWidth -
+            10,
+        });
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica").text(businessAddress, leftX);
+      doc.moveDown(0.3);
+      doc.text(gstinPlaceholder, leftX);
+
+      // Invoice meta (right side)
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("INVOICE", rightX, headerTopY, {
+          width: rightColWidth,
+          align: "right",
+        });
+      doc.fontSize(10).font("Helvetica").moveDown(0.5);
+      doc.text(`Invoice No: ${invoiceNumber}`, rightX, doc.y, {
+        width: rightColWidth,
+        align: "right",
+      });
+      doc.text(
+        `Invoice Date: ${invoiceDate.toLocaleDateString("en-IN", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })}`,
+        rightX,
+        doc.y,
+        { width: rightColWidth, align: "right" }
+      );
+      doc.text(`Order Status: ${order.status}`, rightX, doc.y, {
+        width: rightColWidth,
+        align: "right",
+      });
+      doc.text(`Payment Method: ${order.gateway}`, rightX, doc.y, {
+        width: rightColWidth,
+        align: "right",
+      });
+
+      doc.moveDown(1.5);
+      doc
+        .moveTo(doc.page.margins.left, doc.y)
+        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+        .stroke();
+
+      // BILL TO
+      doc.moveDown(1);
+      doc.fontSize(12).font("Helvetica-Bold").text("Bill To:", leftX);
+      doc.moveDown(0.3);
+
+      // Prefer user profile address; fall back to per-order shippingAddress; finally order.user_name/email
+      const billingSource = userAddress || shippingAddress || null;
+
+      const customerName =
+        billingSource?.first_name && billingSource?.last_name
+          ? `${billingSource.first_name} ${billingSource.last_name}`
+          : order.user_name;
+
+      doc.fontSize(10).font("Helvetica");
+      doc.text(customerName, leftX);
+      if (billingSource) {
+        if (billingSource.address1) {
+          doc.text(billingSource.address1, leftX);
+        }
+        if (billingSource.address2) {
+          doc.text(billingSource.address2, leftX);
+        }
+        const cityLineParts = [
+          billingSource.city,
+          billingSource.province || "",
+          billingSource.zip || "",
+        ].filter(Boolean);
+        if (cityLineParts.length) {
+          doc.text(cityLineParts.join(", "), leftX);
+        }
+        const countryLabel = billingSource.country_code || "IN";
+        doc.text(countryLabel === "IN" ? "India" : countryLabel, leftX);
+        if (billingSource.phone) {
+          doc.text(`Phone: ${billingSource.phone}`, leftX);
+        }
+      }
+      doc.text(`Email: ${order.user_email}`, leftX);
+
+      doc.moveDown(1);
+
+      // ITEMS TABLE HEADER
+      const tableTop = doc.y;
+      const tableWidth =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const colWidths = {
+        product: 140,
+        variant: 100,
+        qty: 30,
+        unit: 60,
+        gstRate: 45,
+        gstAmt: 60,
+        total: 60,
+      };
+      const colProductX = leftX;
+      const colVariantX = colProductX + colWidths.product;
+      const colQtyX = colVariantX + colWidths.variant;
+      const colUnitPriceX = colQtyX + colWidths.qty;
+      const colGstRateX = colUnitPriceX + colWidths.unit;
+      const colGstAmtX = colGstRateX + colWidths.gstRate;
+      const colTotalX = colGstAmtX + colWidths.gstAmt;
+
+      doc.fontSize(9).font("Helvetica-Bold");
+      doc.text("Product", colProductX, tableTop, {
+        width: colWidths.product,
+      });
+      doc.text("Variant", colVariantX, tableTop, {
+        width: colWidths.variant,
+      });
+      doc.text("Qty", colQtyX, tableTop, {
+        width: colWidths.qty,
+        align: "center",
+      });
+      doc.text("Unit Price", colUnitPriceX, tableTop + 2, {
+        width: colWidths.unit,
+        align: "center",
+      });
+      doc.text("GST %", colGstRateX, tableTop + 2, {
+        width: colWidths.gstRate,
+        align: "center",
+      });
+      doc.text("GST Amt", colGstAmtX, tableTop + 2, {
+        width: colWidths.gstAmt,
+        align: "center",
+      });
+      doc.text("Line Total", colTotalX, tableTop, {
+        width: colWidths.total,
+        align: "center",
+      });
+
+      doc.moveDown(0.5);
+      doc
+        .moveTo(doc.page.margins.left, doc.y)
+        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+        .stroke();
+
+      // ITEMS ROWS
+      doc.fontSize(9).font("Helvetica");
+      let currentY = doc.y + 6;
+
+      const formatMoney = (value: number) => {
+        const amount = Math.round(value || 0);
+        return `Rs. ${amount.toLocaleString("en-IN")}`;
+      };
+
+      for (const item of orderItems || []) {
+        const unitPrice = Number(item.unit_price) || 0;
+        const quantity = Number(item.quantity) || 0;
+        const lineTotal =
+          Number(item.total_price) || Math.round(unitPrice * quantity);
+
+        // GST rate logic: same as used when creating the order
+        const gstRate = unitPrice <= 2500 ? 0.05 : 0.18;
+        const unitNet = unitPrice / (1 + gstRate);
+        const unitGst = unitPrice - unitNet;
+        const lineGst = unitGst * quantity;
+
+        // Page break handling
+        if (currentY > doc.page.height - doc.page.margins.bottom - 60) {
+          doc.addPage();
+          currentY = doc.page.margins.top;
+        }
+
+        // Variant (size/color)
+        const variantParts: string[] = [];
+        if (item.size) variantParts.push(`Size: ${item.size}`);
+        if (item.color) variantParts.push(`Color: ${item.color}`);
+        const variantText = variantParts.join("\n");
+
+        // Measure row height based on wrapped text
+        const productText = item.product_name || "Product";
+        const productHeight = doc.heightOfString(productText, {
+          width: colWidths.product,
+        });
+        const variantHeight = doc.heightOfString(variantText || "-", {
+          width: colWidths.variant,
+        });
+        const rowHeight = Math.max(productHeight, variantHeight, 14);
+
+        // Product name
+        doc.text(productText, colProductX, currentY, {
+          width: colWidths.product,
+        });
+
+        // Variant
+        doc.text(variantText || "-", colVariantX, currentY, {
+          width: colWidths.variant,
+        });
+
+        // Quantity
+        doc.text(String(quantity), colQtyX, currentY, {
+          width: colWidths.qty,
+          align: "center",
+        });
+
+        // Unit price (incl. GST)
+        doc.text(formatMoney(unitPrice), colUnitPriceX, currentY, {
+          width: colWidths.unit,
+          align: "center",
+        });
+
+        // GST rate
+        doc.text(`${(gstRate * 100).toFixed(0)}%`, colGstRateX, currentY, {
+          width: colWidths.gstRate,
+          align: "center",
+        });
+
+        // GST amount
+        doc.text(formatMoney(lineGst), colGstAmtX, currentY, {
+          width: colWidths.gstAmt,
+          align: "center",
+        });
+
+        // Line total
+        doc.text(formatMoney(lineTotal), colTotalX, currentY, {
+          width: colWidths.total,
+          align: "center",
+        });
+
+        currentY += rowHeight + 6;
+      }
+
+      doc
+        .moveTo(doc.page.margins.left, currentY + 4)
+        .lineTo(doc.page.width - doc.page.margins.right, currentY + 4)
+        .stroke();
+
+      // SUMMARY
+      const summaryTop = currentY + 16;
+      // Summary box on the right side with fixed width
+      const summaryBoxWidth = 220;
+      const summaryBoxX =
+        doc.page.width - doc.page.margins.right - summaryBoxWidth;
+      const summaryLabelWidth = 120;
+      const summaryValueWidth = summaryBoxWidth - summaryLabelWidth;
+
+      const subtotal = Number(order.subtotal) || 0;
+      const taxAmount = Number(order.tax_amount) || 0;
+      const totalAmount = Number(order.total_amount) || 0;
+
+      doc.fontSize(10).font("Helvetica");
+
+      // Subtotal
+      doc.text("Subtotal (excl. GST)", summaryBoxX, summaryTop, {
+        width: summaryLabelWidth,
+        align: "right",
+      });
+      doc.text(formatMoney(subtotal), summaryBoxX + summaryLabelWidth, summaryTop, {
+        width: summaryValueWidth,
+        align: "right",
+      });
+
+      // GST total
+      doc.text("GST Total", summaryBoxX, summaryTop + 14, {
+        width: summaryLabelWidth,
+        align: "right",
+      });
+      doc.text(formatMoney(taxAmount), summaryBoxX + summaryLabelWidth, summaryTop + 14, {
+        width: summaryValueWidth,
+        align: "right",
+      });
+
+      // Total amount
+      doc.font("Helvetica-Bold");
+      doc.text("Total Amount", summaryBoxX, summaryTop + 30, {
+        width: summaryLabelWidth,
+        align: "right",
+      });
+      doc.text(formatMoney(totalAmount), summaryBoxX + summaryLabelWidth, summaryTop + 30, {
+        width: summaryValueWidth,
+        align: "right",
+      });
+
+      // FOOTER
+      doc.moveDown(4);
+      doc.fontSize(8).font("Helvetica");
+      const footerWidth =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      doc.text(
+        "This is a system-generated invoice for your order at Luxe Threads. GST details will be updated once registration is complete.",
+        doc.page.margins.left,
+        doc.y,
+        {
+          width: footerWidth,
+          align: "center",
+        }
+      );
+      doc.moveDown(0.5);
+      doc.text("Thank you for shopping with us!", doc.page.margins.left, doc.y, {
+        width: footerWidth,
+        align: "center",
+      });
+
+      doc.end();
+    } catch (error: any) {
+      console.error("Error generating invoice PDF:", error);
       next(error);
     }
   }

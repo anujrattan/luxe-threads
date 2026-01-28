@@ -93,6 +93,9 @@ const transformProduct = (dbProduct: any, category?: any) => {
     tags: dbProduct.usp_tag ? [dbProduct.usp_tag] : [],
     reviewCount: dbProduct.rating_count || dbProduct.review_count || dbProduct.reviewCount || 0,
     discount: hasAnyDiscount ? `Save $${totalSavings.toFixed(0)}` : undefined,
+    vendor_base_cost: dbProduct.vendor_base_cost || undefined,
+    vendor_shipping_cost: dbProduct.vendor_shipping_cost || undefined,
+    target_margin_percent: dbProduct.target_margin_percent || undefined,
   };
 };
 
@@ -572,6 +575,9 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
       colors,
       fulfillment_partner,
       partner_product_id,
+      vendor_base_cost,
+      vendor_shipping_cost,
+      target_margin_percent,
     } = req.body;
     
     // Ensure sizes and colors are arrays
@@ -644,6 +650,24 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
     if (review_count !== undefined) productData.review_count = parseInt(review_count);
     if (fulfillment_partner) productData.fulfillment_partner = fulfillment_partner;
     if (partner_product_id) productData.partner_product_id = partner_product_id;
+    if (vendor_base_cost !== undefined && vendor_base_cost !== null && vendor_base_cost !== '') {
+      const parsed = parseFloat(vendor_base_cost);
+      if (!isNaN(parsed) && parsed >= 0) {
+        productData.vendor_base_cost = parsed;
+      }
+    }
+    if (vendor_shipping_cost !== undefined && vendor_shipping_cost !== null && vendor_shipping_cost !== '') {
+      const parsed = parseFloat(vendor_shipping_cost);
+      if (!isNaN(parsed) && parsed >= 0) {
+        productData.vendor_shipping_cost = parsed;
+      }
+    }
+    if (target_margin_percent !== undefined && target_margin_percent !== null && target_margin_percent !== '') {
+      const parsed = parseFloat(target_margin_percent);
+      if (!isNaN(parsed) && parsed >= 0) {
+        productData.target_margin_percent = parsed;
+      }
+    }
     
     const { data, error } = await supabaseAdmin
       .from('products')
@@ -750,6 +774,9 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
       colors,
       fulfillment_partner,
       partner_product_id,
+      vendor_base_cost,
+      vendor_shipping_cost,
+      target_margin_percent,
     } = req.body;
     
     // Ensure sizes and colors are arrays
@@ -814,6 +841,45 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
     }
     if (fulfillment_partner !== undefined) productData.fulfillment_partner = fulfillment_partner || null;
     if (partner_product_id !== undefined) productData.partner_product_id = partner_product_id || null;
+    if (vendor_base_cost !== undefined) {
+      if (vendor_base_cost === null || vendor_base_cost === '') {
+        productData.vendor_base_cost = null;
+      } else {
+        const parsed = parseFloat(vendor_base_cost);
+        if (isNaN(parsed) || parsed < 0) {
+          return res.status(400).json({
+            error: 'Invalid vendor_base_cost. Must be a valid non-negative number.',
+          });
+        }
+        productData.vendor_base_cost = parsed;
+      }
+    }
+    if (vendor_shipping_cost !== undefined) {
+      if (vendor_shipping_cost === null || vendor_shipping_cost === '') {
+        productData.vendor_shipping_cost = null;
+      } else {
+        const parsed = parseFloat(vendor_shipping_cost);
+        if (isNaN(parsed) || parsed < 0) {
+          return res.status(400).json({
+            error: 'Invalid vendor_shipping_cost. Must be a valid non-negative number.',
+          });
+        }
+        productData.vendor_shipping_cost = parsed;
+      }
+    }
+    if (target_margin_percent !== undefined) {
+      if (target_margin_percent === null || target_margin_percent === '') {
+        productData.target_margin_percent = null;
+      } else {
+        const parsed = parseFloat(target_margin_percent);
+        if (isNaN(parsed) || parsed < 0) {
+          return res.status(400).json({
+            error: 'Invalid target_margin_percent. Must be a valid non-negative number.',
+          });
+        }
+        productData.target_margin_percent = parsed;
+      }
+    }
     
     const { data, error } = await supabaseAdmin
       .from('products')

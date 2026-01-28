@@ -84,10 +84,17 @@ router.get("/", authenticateOrGuest, async (req: Request, res: Response, next: N
         .eq("auth_user_id", userId)
         .single();
 
+      // If there is no user profile yet, treat it as "no wishlist items"
+      // instead of an error so first-time logged-in users don't see failures.
       if (userError || !user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
+        console.warn(
+          "[WISHLIST] No user record found for auth_user_id, returning empty wishlist"
+        );
+        return res.json({
+          success: true,
+          items: [],
+          count: 0,
+          maxItems: WISHLIST_CONFIG.MAX_ITEMS,
         });
       }
 

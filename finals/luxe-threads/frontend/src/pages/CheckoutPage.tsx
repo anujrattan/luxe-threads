@@ -431,7 +431,9 @@ export const CheckoutPage: React.FC = () => {
   const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   // Prices are tax-inclusive; no extra tax added at checkout
   const shippingCost = 0;
-  const total = subtotal + shippingCost;
+  const COD_FEE = 99;
+  const codFee = paymentMethod === 'COD' ? COD_FEE : 0;
+  const total = subtotal + shippingCost + codFee;
 
   // Fetch saved addresses for logged-in users
   useEffect(() => {
@@ -520,6 +522,9 @@ export const CheckoutPage: React.FC = () => {
         customer: addressData,
         items: cart,
         total: total,
+        // For now, we don't charge separate shipping; COD handling is tracked separately
+        shippingCost: shippingCost,
+        codFee: codFee,
       };
 
       // Step 1: Create order in database
@@ -794,6 +799,12 @@ export const CheckoutPage: React.FC = () => {
                   <span>Subtotal</span>
                   <span className="text-brand-primary">{formatCurrency(subtotal, currency)}</span>
                 </div>
+                {paymentMethod === 'COD' && (
+                  <div className="flex justify-between text-sm text-brand-secondary">
+                    <span>COD Handling Fee</span>
+                    <span className="text-brand-primary">{formatCurrency(COD_FEE, currency)}</span>
+                  </div>
+                )}
                 {shippingCost > 0 && (
                   <div className="flex justify-between text-sm text-brand-secondary">
                     <span>Shipping</span>
@@ -833,6 +844,12 @@ export const CheckoutPage: React.FC = () => {
                   <span>Subtotal</span>
                   <span className="text-brand-primary">{formatCurrency(subtotal, currency)}</span>
                 </div>
+                {paymentMethod === 'COD' && (
+                  <div className="flex justify-between text-sm text-brand-secondary">
+                    <span>COD Handling Fee</span>
+                    <span className="text-brand-primary">{formatCurrency(COD_FEE, currency)}</span>
+                  </div>
+                )}
                 {shippingCost > 0 && (
                   <div className="flex justify-between text-sm text-brand-secondary">
                     <span>Shipping</span>

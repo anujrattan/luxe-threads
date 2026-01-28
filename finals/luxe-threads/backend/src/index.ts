@@ -17,6 +17,8 @@ import categoryRoutes from "./routes/categories.js";
 import orderRoutes from "./routes/orders.js";
 import paymentRoutes from "./routes/payments.js";
 import analyticsRoutes from "./routes/analytics.js";
+import blogRoutes from "./routes/blog.js";
+import faqRoutes from "./routes/faqs.js";
 import userRoutes from "./routes/users.js";
 import wishlistRoutes from "./routes/wishlists.js";
 import ratingsRoutes from "./routes/ratings.js";
@@ -49,6 +51,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/wishlists", wishlistRoutes);
 app.use("/api/ratings", ratingsRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/blog", blogRoutes);
+app.use("/api/faqs", faqRoutes);
 
 // Error handling
 app.use(notFound);

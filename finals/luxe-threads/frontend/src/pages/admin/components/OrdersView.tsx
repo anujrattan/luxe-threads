@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, Button, Input } from '../../../components/ui';
 import { ShoppingBagIcon, EditIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon } from '../../../components/icons';
 import { formatCurrency } from '../../../utils/currency';
+import { OrderCard } from './OrderCard';
 
 interface OrdersViewProps {
   orders: any[];
@@ -193,8 +194,30 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         </div>
       </Card>
 
-      {/* Orders Table */}
-      <Card className="overflow-hidden border-white/10">
+      {/* Orders - Mobile Card View */}
+      <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+        {paginatedOrders.length === 0 ? (
+          <Card className="p-12 text-center col-span-full">
+            <p className="text-brand-secondary">
+              {searchQuery || statusFilter !== 'all'
+                ? 'No orders found matching your criteria'
+                : 'No orders found'}
+            </p>
+          </Card>
+        ) : (
+          paginatedOrders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              currency={currency}
+              onSelectOrder={onSelectOrder}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Orders - Desktop Table View */}
+      <Card className="hidden lg:block overflow-hidden border-white/10">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-white/10">
             <thead className="bg-gradient-to-r from-purple-500/10 to-pink-500/10">
@@ -314,10 +337,12 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
             </tbody>
           </table>
         </div>
+      </Card>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+      {/* Pagination - Shared between mobile and desktop views */}
+      {totalPages > 1 && (
+        <Card className="p-4 border-white/10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-brand-secondary">
               Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} orders
             </div>
@@ -369,8 +394,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
               </button>
             </div>
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 };

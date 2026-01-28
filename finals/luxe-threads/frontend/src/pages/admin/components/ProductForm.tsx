@@ -14,6 +14,9 @@ export const ProductForm: React.FC<{ product?: Product | null, onSave: () => voi
     title: product?.title || product?.name || '',
     description: product?.description || '',
     selling_price: product?.selling_price || product?.price || 0,
+    vendor_base_cost: (product as any)?.vendor_base_cost || '',
+    vendor_shipping_cost: (product as any)?.vendor_shipping_cost || '',
+    target_margin_percent: (product as any)?.target_margin_percent ?? 100,
     discount_percentage: product?.discount_percentage || 0,
     on_sale: product?.on_sale || false,
     sale_discount_percentage: product?.sale_discount_percentage || 0,
@@ -435,6 +438,11 @@ export const ProductForm: React.FC<{ product?: Product | null, onSave: () => voi
         colors: colorsArray,
         fulfillment_partner: formData.fulfillment_partner || null,
         partner_product_id: formData.partner_product_id || null,
+        vendor_base_cost: formData.vendor_base_cost !== '' ? Number(formData.vendor_base_cost) : null,
+        vendor_shipping_cost: formData.vendor_shipping_cost !== '' ? Number(formData.vendor_shipping_cost) : null,
+        target_margin_percent: formData.target_margin_percent !== undefined && formData.target_margin_percent !== null
+          ? Number(formData.target_margin_percent)
+          : 100,
         // Mockup images organized by color
         mockup_images_by_color: Object.keys(mockupImagesByColorData).length > 0 ? mockupImagesByColorData : undefined,
       };
@@ -557,20 +565,91 @@ export const ProductForm: React.FC<{ product?: Product | null, onSave: () => voi
             />
           </div>
 
-          {/* Selling Price */}
-          <div>
-            <label className="block text-sm font-semibold text-brand-primary mb-2">
-              Selling Price ({getCurrencySymbol(currency)}) <span className="text-red-400">*</span>
-            </label>
-            <Input 
-              name="selling_price" 
-              type="number" 
-              step="0.01"
-              placeholder="35.00" 
-              value={formData.selling_price} 
-              onChange={handleChange} 
-              required
-            />
+          {/* Cost & Pricing */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Vendor Base Cost */}
+            <div>
+              <label className="block text-sm font-semibold text-brand-primary mb-2">
+                Vendor Product Cost ({getCurrencySymbol(currency)})
+              </label>
+              <Input
+                name="vendor_base_cost"
+                type="number"
+                step="0.01"
+                placeholder="Base cost from vendor"
+                value={formData.vendor_base_cost}
+                onChange={handleChange}
+              />
+            </div>
+
+            {/* Vendor Shipping Cost */}
+            <div>
+              <label className="block text-sm font-semibold text-brand-primary mb-2">
+                Vendor Shipping Cost ({getCurrencySymbol(currency)})
+              </label>
+              <Input
+                name="vendor_shipping_cost"
+                type="number"
+                step="0.01"
+                placeholder="Shipping cost from vendor"
+                value={formData.vendor_shipping_cost}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          {/* Target Margin & Selling Price */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-brand-primary mb-2">
+                Target Margin (%)
+              </label>
+              <Input
+                name="target_margin_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="1000"
+                placeholder="100"
+                value={formData.target_margin_percent}
+                onChange={handleChange}
+              />
+              <p className="text-xs text-brand-secondary mt-1">
+                Default 100% = 2× (vendor cost + vendor shipping)
+              </p>
+            </div>
+
+            {/* Selling Price */}
+            <div>
+              <label className="block text-sm font-semibold text-brand-primary mb-2">
+                Selling Price ({getCurrencySymbol(currency)}) <span className="text-red-400">*</span>
+              </label>
+              <Input 
+                name="selling_price" 
+                type="number" 
+                step="0.01"
+                placeholder="35.00" 
+                value={formData.selling_price} 
+                onChange={handleChange} 
+                required
+              />
+              {/* Suggested price helper */}
+              {(() => {
+                const base = parseFloat(String(formData.vendor_base_cost || '0')) || 0;
+                const ship = parseFloat(String(formData.vendor_shipping_cost || '0')) || 0;
+                const margin = parseFloat(String(formData.target_margin_percent ?? 100)) || 0;
+                const cost = base + ship;
+                if (cost > 0 && margin >= 0) {
+                  const suggested = cost * (1 + margin / 100);
+                  return (
+                    <p className="text-xs text-brand-secondary mt-1">
+                      Suggested price at {margin.toFixed(1)}% margin: {formatCurrency(suggested, currency)}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
           </div>
 
           {/* Discount Percentage */}

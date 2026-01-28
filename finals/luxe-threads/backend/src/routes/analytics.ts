@@ -95,7 +95,7 @@ router.get(
       const { data: orders, error: ordersError } = await supabaseAdmin
         .from("orders")
         .select(
-          "id, created_at, status, total_amount, subtotal, tax_amount, shipping_cost, gateway, fulfillment_partner"
+          "id, created_at, status, total_amount, subtotal, tax_amount, shipping_cost, cod_fee, gateway, fulfillment_partner"
         )
         .gte("created_at", fromIso)
         .lte("created_at", toIso);
@@ -192,6 +192,7 @@ router.get(
       let totalRevenue = 0;
       let totalDeliveredRevenue = 0;
       let totalTax = 0;
+      let totalCodFee = 0;
 
       const byStatus: Record<
         string,
@@ -200,7 +201,7 @@ router.get(
 
       const byGateway: Record<
         string,
-        { count: number; revenue: number }
+        { count: number; revenue: number; cod_fee: number }
       > = {};
 
       const byFulfillmentPartner: Record<
@@ -221,9 +222,11 @@ router.get(
         const partner = order.fulfillment_partner || "Unassigned";
         const totalAmount = Number(order.total_amount) || 0;
         const taxAmount = Number(order.tax_amount) || 0;
+        const codFee = Number((order as any).cod_fee) || 0;
 
         totalRevenue += totalAmount;
         totalTax += taxAmount;
+        totalCodFee += codFee;
 
         if (status === "delivered") {
           totalDeliveredOrders += 1;
@@ -239,10 +242,11 @@ router.get(
 
         // By payment method / gateway
         if (!byGateway[gateway]) {
-          byGateway[gateway] = { count: 0, revenue: 0 };
+          byGateway[gateway] = { count: 0, revenue: 0, cod_fee: 0 };
         }
         byGateway[gateway].count += 1;
         byGateway[gateway].revenue += totalAmount;
+        byGateway[gateway].cod_fee += codFee;
 
         // By fulfillment partner
         if (!byFulfillmentPartner[partner]) {
@@ -405,6 +409,7 @@ router.get(
           total_revenue: totalRevenue,
           delivered_revenue: totalDeliveredRevenue,
           total_tax: totalTax,
+          total_cod_fee: totalCodFee,
           average_order_value: avgOrderValue,
         },
         by_status: byStatus,

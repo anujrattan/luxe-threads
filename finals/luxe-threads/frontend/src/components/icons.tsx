@@ -70,6 +70,10 @@ import {
   Receipt,
   CheckCircle,
   RefreshCw,
+  Download,
+  Calendar,
+  CreditCard,
+  MapPin,
 } from 'lucide-react';
 
 // Re-export all Lucide icons with our naming convention
@@ -130,6 +134,10 @@ export const ReceiptIcon = Receipt;
 export const BoxIcon = LucideBox;
 export const CheckCircleIcon = CheckCircle;
 export const RefreshCwIcon = RefreshCw;
+export const DownloadIcon = Download;
+export const CalendarIcon = Calendar;
+export const CreditCardIcon = CreditCard;
+export const MapPinIcon = MapPin;
 
 /**
  * Custom StarIcon Component

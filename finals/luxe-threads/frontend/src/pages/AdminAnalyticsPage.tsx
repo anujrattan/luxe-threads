@@ -281,7 +281,7 @@ export const AdminAnalyticsPage: React.FC = () => {
           </Card>
 
           {/* Primary KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Total Orders */}
             <div className="bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-xl p-6 shadow-sm">
               <div className="flex items-start justify-between mb-4">
@@ -343,6 +343,22 @@ export const AdminAnalyticsPage: React.FC = () => {
               </p>
               <p className="text-sm text-brand-secondary">
                 From {summary.total_orders || 0} orders
+              </p>
+            </div>
+
+            {/* COD Fees Collected */}
+            <div className="bg-white dark:bg-brand-surface border border-gray-200 dark:border-white/10 rounded-xl p-6 shadow-sm">
+              <div className="flex items-start justify-between mb-4">
+                <p className="text-sm font-medium text-brand-secondary">COD Fees Collected</p>
+                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <ReceiptIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-brand-primary mb-1">
+                {formatCurrency(summary.total_cod_fee || 0, 'INR')}
+              </p>
+              <p className="text-sm text-brand-secondary">
+                From {(data?.by_payment_method?.COD?.count ?? data?.by_payment_method?.Cod?.count ?? 0) || 0} COD orders
               </p>
             </div>
           </div>

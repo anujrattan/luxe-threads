@@ -12,6 +12,9 @@ export interface Product {
   title: string;
   description: string;
   selling_price: number;
+  vendor_base_cost?: number;
+  vendor_shipping_cost?: number;
+  target_margin_percent?: number;
   discount_percentage?: number;
   on_sale?: boolean;
   sale_discount_percentage?: number;
